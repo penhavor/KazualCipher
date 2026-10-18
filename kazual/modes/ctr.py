@@ -13,6 +13,7 @@ from __future__ import annotations
 __all__ = ['counter_bytes_for_block', 'ctr_iv', 'ctr_xor', 'CtrError']
 
 _SEG_BLOCKS = 1 << 12          # блоков на сегмент (~256 КиБ для Kazual-512)
+_SEG_NATIVE_BYTES = 1 << 23    # сегмент нативного пути (8 МиБ — prange)
 
 
 class CtrError(ValueError):
@@ -59,6 +60,26 @@ def ctr_xor(spec, k_enc: bytes, data: bytes, v: bytes, km=None,
 
     if km is None:
         km = key_schedule(spec, k_enc)
+
+    # нативный слитный путь (numba): keystream⊕данные одним проходом,
+    # параллельно по блокам — основной ускоритель больших объёмов
+    if backend in ('auto', 'native'):
+        from ..cipher.batch import native_ctx
+        nc = native_ctx(spec, km)
+        if nc is not None:
+            out = bytearray(len(data))
+            seg_bytes = _SEG_NATIVE_BYTES
+            done = 0
+            for s in range(0, len(data), seg_bytes):
+                chunk = data[s:s + seg_bytes]
+                seg = nc.ctr_xor(chunk, bytes(iv), ctr_start + s // b)
+                out[s:s + len(chunk)] = seg[:len(chunk)].tobytes()
+                done += (len(chunk) + b - 1) // b
+                if progress_cb is not None:
+                    progress_cb(done / total_blocks)
+            return bytes(out)
+        if backend == 'native':
+            raise CtrError('нативный бэкенд недоступен (numba/Kazual-512)')
 
     out = bytearray(len(data))
     done = 0

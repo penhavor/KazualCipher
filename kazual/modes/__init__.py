@@ -1,22 +1,26 @@
 # -*- coding: utf-8 -*-
-"""Режимы работы шифров Kazual: SIV-пакет, ECB, CTR, MAC и дополнение."""
+"""Режимы работы шифров Kazual: контейнер v2, SIV (tree-MAC), ECB, CTR, PKCS#7."""
 
 from .padding import pkcs7_pad, pkcs7_unpad, PaddingError
-from .mac import siv_mac, siv_mac_streaming, GornMacError, mac_domain_tag
+from .mac import (tree_mac, tree_leaf_digest, tree_root_hasher,
+                  GornMacError, V_BYTES, DEFAULT_LEAF_SIZE)
 from .ctr import ctr_xor, ctr_iv, counter_bytes_for_block, CtrError
-from .siv import (SivOptions, SivPacket, SivResult, PacketField,
-                  encrypt_siv, decrypt_siv, parse_packet, MacError,
-                  PacketFormatError, PREFIX_BYTES, RANDOM_BYTES, V_BYTES,
-                  MAGIC, default_prefix_text)
+from .siv import (SivOptions, SivResult, PacketField, MacError,
+                  PacketFormatError, RANDOM_BYTES, MAGIC)
 from .ecb import encrypt_ecb, decrypt_ecb, EcbResult
+from .container import (ContainerInfo, build_header, parse_header,
+                        is_container, MODE_SIV, MODE_ECB)
+from .siv2 import encrypt_siv2, decrypt_siv2, encrypt_ecb2, decrypt_ecb2
 
 __all__ = [
     'pkcs7_pad', 'pkcs7_unpad', 'PaddingError',
-    'siv_mac', 'siv_mac_streaming', 'GornMacError', 'mac_domain_tag',
+    'tree_mac', 'tree_leaf_digest', 'tree_root_hasher', 'GornMacError',
+    'V_BYTES', 'DEFAULT_LEAF_SIZE',
     'ctr_xor', 'ctr_iv', 'counter_bytes_for_block', 'CtrError',
-    'SivOptions', 'SivPacket', 'SivResult', 'PacketField',
-    'encrypt_siv', 'decrypt_siv', 'parse_packet', 'MacError',
-    'PacketFormatError', 'PREFIX_BYTES', 'RANDOM_BYTES', 'V_BYTES',
-    'MAGIC', 'default_prefix_text',
+    'SivOptions', 'SivResult', 'PacketField', 'MacError',
+    'PacketFormatError', 'RANDOM_BYTES', 'MAGIC',
     'encrypt_ecb', 'decrypt_ecb', 'EcbResult',
+    'ContainerInfo', 'build_header', 'parse_header', 'is_container',
+    'MODE_SIV', 'MODE_ECB',
+    'encrypt_siv2', 'decrypt_siv2', 'encrypt_ecb2', 'decrypt_ecb2',
 ]

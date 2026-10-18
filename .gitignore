@@ -29,3 +29,8 @@ Thumbs.db
 *.b64
 *.hex
 scratch/
+
+# пользовательский конфиг рядом с программой (портативный режим)
+config.json
+config.json.broken
+configs/

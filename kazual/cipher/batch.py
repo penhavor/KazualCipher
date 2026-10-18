@@ -384,6 +384,12 @@ def decrypt_blocks(spec, K, data, backend='auto', workers=1, km=None):
     return _blocks(spec, K, data, 'dec', backend, workers, km)
 
 
+def native_ctx(spec, km):
+    """Нативный (numba) контекст для spec/km или None."""
+    from . import _accel
+    return _accel.cipher_for(spec, km)
+
+
 def _blocks(spec, K, data, mode, backend, workers, km):
     b = spec.block_bytes
     if len(data) % b:
@@ -393,6 +399,17 @@ def _blocks(spec, K, data, mode, backend, workers, km):
         return b''
     if workers and workers > 1 and total >= 2048 * workers:
         return _run_mp(spec, K, data, mode, workers, km)
+    if backend in ('auto', 'native'):
+        if km is None:
+            km = key_schedule(spec, K)
+        nc = native_ctx(spec, km)
+        if nc is not None:
+            return nc.encrypt_blocks(data) if mode == 'enc' \
+                else nc.decrypt_blocks(data)
+        if backend == 'native':
+            raise RuntimeError(
+                'нативный бэкенд недоступен (numba не установлен или шифр '
+                'не Kazual-512)')
     if backend == 'auto':
         cp = cupy_backend()
         if cp is not None and total >= _GPU_MIN_BLOCKS:

@@ -32,7 +32,9 @@ def test_gorn_hasher_equals_oneshot(rnd):
     """Инкрементальный ГОРН побитово равен gorn_hash при любом дроблении."""
     for _ in range(6):
         msg = os.urandom(rnd.randrange(0, 400))
-        tag = os.urandom(rnd.randrange(0, 24))
+        # 0x1F в теге — разделитель доменов: API обязан его отклонять,
+        # поэтому в тесте побитово заменяем его, чтобы не ловить флейк
+        tag = os.urandom(rnd.randrange(0, 24)).replace(b'\x1f', b'\x20')
         h = GornHasher(tag)
         pos = 0
         while pos < len(msg):

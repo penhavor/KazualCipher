@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kazualcipher"
-version = "1.0.0"
-description = "GUI и режимы работы (SIV/ECB) для экспериментальных блочных шифров Kazual-512 и Kazual-64"
+version = "1.1.1"
+description = "Готовый продукт: GUI, режимы SIV/ECB, самоопределяемый контейнер v2, потоковая обработка файлов любого размера и JIT-ускорение для экспериментальных блочных шифров Kazual-512 и Kazual-64"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 authors = [{ name = "KazualCipher contributors" }]
 keywords = ["cryptography", "block-cipher", "siv", "education", "qt", "pyside6"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: X11 Applications :: Qt",
     "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pyflakes>=3.0"]
+fast = ["numba>=0.59"]   # JIT-ускорение ядер (~40x); без неё работает эталонный путь
 
 [project.scripts]
 kazualcipher = "kazual.cli:main"

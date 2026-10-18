@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Страница «Пакет»: живая схема SIV-пакета и разбор реального примера."""
+"""Страница «Пакет»: живая схема контейнера и разбор реального примера."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRectF, Signal
-from PySide6.QtGui import (QBrush, QColor, QFont, QPainter, QPen,
-                           QGuiApplication)
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (QHBoxLayout, QHeaderView, QLabel, QPushButton,
                                QTableWidget, QTableWidgetItem, QVBoxLayout,
                                QWidget, QPlainTextEdit)
@@ -15,29 +14,37 @@ from .. import theme
 from . import common
 
 FIELD_COLORS = {
-    'prefix': '#f5a623',
+    'header': '#5b8def',
+    'brand': '#f5a623',
     'params': '#2dd4bf',
     'random': '#6d5df6',
+    'leaf': '#8b93a7',
+    'total_len': '#8b93a7',
     'V': '#34d399',
     'ciphertext': '#5b8def',
 }
 
-FIELD_NOTES = {
-    'prefix': '«магические байты» 89 4B 5A 4C + бренд + версия — как ‰PNG у '
-              'картинок. Нулевая энтропия и нулевая защита сам по себе: это '
-              'форматный фильтр «свой/чужой, той ли версии», покрытый MAC’ом.',
-    'params': 'самоопписание KDF в PHC-стиле ($argon2id$m=…,t=…,p=…) с '
-              'u16-длиной. Поднимете m/t — старые пакеты останутся читаемыми: '
-              'параметры лежат в них самих.',
-    'random': 'соль Argon2id: даже один пароль даёт разный мастер-ключ на '
-              'каждое сообщение; наблюдатель не видит повторов. Безопасность '
-              'от него не зависит: если ГСЧ сломается и random повторится, '
-              'V всё равно разведёт разные тексты (в этом суть SIV).',
-    'V': 'синтетический nonce для CTR и тег подлинности в одном лице: '
-         'MAC(K_mac) от всех полей пакета + открытого текста. Всегда 512 бит.',
-    'ciphertext': 'CTR(K_enc, V‖counter) без сцеплений: блоки независимы, '
-                  'параллелятся, паддинга нет.',
-}
+FIELD_NOTES = [
+    ('header', 'магические байты 89 4B 5A 4C ‖ версия ‖ шифр ‖ режим ‖ флаги '
+               '‖ длина бренда — по ним файл узнаётся сам, без «галочек».'),
+    ('brand', 'необязательная текстовая метка (до 255 байт): владелец, '
+              'версия архива… Покрыта MAC’ом — подделать нельзя.'),
+    ('params', 'PHC-строка Argon2id ($argon2id$v=19$m=…,t=…,p=…): файл сам '
+               'рассказывает, с какими параметрами выводить ключ. Поднимете '
+               'm/t — старые файлы останутся читаемыми.'),
+    ('random', 'соль/nonce (256 бит): один пароль → разный ключ на каждый '
+               'файл; наблюдатель не видит повторов. Безопасность от него не '
+               'зависит — одинаковые тексты разводит тег V (суть SIV).'),
+    ('leaf', 'размер листа tree-MAC (u32): большие файлы хэшируются '
+             'параллельными «листьями» — MAC использует все ядра CPU.'),
+    ('total_len', 'точная длина открытых данных (u64) — защита от обрезания '
+                  'файла.'),
+    ('V', 'тег подлинности (512 бит): корень tree-MAC от всех полей '
+          'заголовка и данных. Одновременно — nonce для CTR. Любая подмена '
+          'любого байта файла обнаруживается.'),
+    ('ciphertext', 'CTR(K_enc, V‖counter) без сцеплений: блоки независимы, '
+                   'шифрование параллельно, паддинга нет.'),
+]
 
 
 class PacketDiagram(QWidget):
@@ -45,7 +52,7 @@ class PacketDiagram(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(128)
+        self.setMinimumHeight(132)
         self._fields = []            # [(name, size, enabled)]
         self._total_note = ''
 
@@ -65,11 +72,11 @@ class PacketDiagram(QWidget):
         if not fields:
             p.setPen(QColor(theme.MUTED))
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
-                       'Выберите режим SIV слева — здесь появится схема пакета')
+                       'Выберите режим SIV слева — здесь появится схема '
+                       'пакета')
             p.end()
             return
 
-        # ширины: sqrt-масштаб с минимумом; отключённые поля — узкие
         import math
         weights = []
         for name, size, enabled in fields:
@@ -90,9 +97,10 @@ class PacketDiagram(QWidget):
             color = QColor(FIELD_COLORS.get(name, theme.MUTED))
             rect = QRectF(x, y, bw, h)
             if enabled:
-                color.setAlpha(58)
-                p.setPen(QPen(QColor(FIELD_COLORS.get(name, theme.MUTED)), 1.6))
-                p.setBrush(QBrush(color))
+                fill = QColor(color)
+                fill.setAlpha(58)
+                p.setPen(QPen(color, 1.6))
+                p.setBrush(QBrush(fill))
                 p.drawRoundedRect(rect, 8, 8)
                 p.setPen(QColor(theme.TEXT))
                 p.setFont(QFont(self.font().family(), 9, QFont.Weight.DemiBold))
@@ -137,14 +145,14 @@ class PacketPage(QWidget):
 
     def _build(self):
         v = QVBoxLayout(self)
-        v.setContentsMargins(24, 18, 24, 18)
+        v.setContentsMargins(24, 16, 24, 16)
         v.setSpacing(12)
 
         head = QLabel('Структура пакета')
         head.setProperty('kind', 'title')
-        sub = QLabel('Схема обновляется вживую при переключении галочек '
-                     'слева; кнопка ниже собирает настоящий пакет на '
-                     'примере текста и раскладывает его по байтам.')
+        sub = QLabel('Схема обновляется вживую при изменении настроек слева; '
+                     'кнопка ниже собирает настоящий пакет на примере текста '
+                     'и раскладывает его по байтам.')
         sub.setProperty('kind', 'subtitle')
         sub.setWordWrap(True)
         v.addWidget(head)
@@ -153,7 +161,6 @@ class PacketPage(QWidget):
         self.diagram = PacketDiagram()
         v.addWidget(self.diagram)
 
-        # ---- живой пример ----
         row = QHBoxLayout()
         self.btn_example = QPushButton('Собрать пример на текущих настройках')
         self.btn_example.clicked.connect(self._build_example)
@@ -180,16 +187,15 @@ class PacketPage(QWidget):
             2, QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setStyleSheet('QTableWidget { background: %s; border: 1px '
-                                 'solid %s; border-radius: 10px; }'
-                                 'QHeaderView::section { background: %s; '
-                                 'border: none; padding: 6px; color: %s; }'
-                                 % (theme.PANEL, theme.BORDER, theme.PANEL,
-                                    theme.MUTED))
+        self.table.setStyleSheet(
+            'QTableWidget { background: %s; border: 1px solid %s;'
+            'border-radius: 10px; }'
+            'QHeaderView::section { background: %s; border: none;'
+            'padding: 6px; color: %s; }'
+            % (theme.PANEL, theme.BORDER, theme.PANEL, theme.MUTED))
         self.table.setMinimumHeight(180)
         v.addWidget(self.table, 1)
 
-        # ---- описания полей ----
         notes = QLabel('')
         notes.setWordWrap(True)
         notes.setTextFormat(Qt.TextFormat.RichText)
@@ -198,8 +204,8 @@ class PacketPage(QWidget):
         notes.setStyleSheet('font-size: 9pt; color: %s;' % theme.MUTED)
         notes.setText('<br>'.join(
             '<b style="color:%s">%s</b> — %s'
-            % (FIELD_COLORS[k], k, FIELD_NOTES[k])
-            for k in ('prefix', 'params', 'random', 'V', 'ciphertext')))
+            % (FIELD_COLORS.get(k, theme.MUTED), k, note)
+            for k, note in FIELD_NOTES))
         v.addWidget(notes, 0)
 
     # -------------------------------------------------------------- logic
@@ -209,32 +215,32 @@ class PacketPage(QWidget):
         if sb.mode() != 'siv':
             self.diagram.set_fields(
                 [('ciphertext', 64, True)],
-                'ECB: контейнера нет — только шифроблоки с PKCS#7-дополнением '
-                '(оверхед 1…%d Б)' % engine.CIPHER_BY_NAME[
-                    sb.cipher_name()].spec.block_bytes)
+                'ECB: контейнер = заголовок (~%d Б) + шифроблоки с '
+                'PKCS#7-дополнением' % 60)
             self.btn_example.setEnabled(True)
             return
         opts = sb.siv_options()
-        try:
-            prefix = opts.resolve_prefix(sb.cipher_name())
-            params = opts.resolve_params_field()
-        except (engine.KazualError, ValueError):
-            prefix, params = b'', b''
         sample_len = max(1, len(self.ed_example.toPlainText().encode('utf-8')))
+        brand = (opts.prefix_text or '').encode('utf-8') \
+            if opts.prefix_enabled else b''
+        brand = brand[:255]
+        params = opts.resolve_params_field() if opts.params_enabled else b''
         rnd = 32 if opts.random_enabled else 0
         fields = [
-            ('prefix', len(prefix), opts.prefix_enabled),
+            ('header', 9, True),
+            ('brand', len(brand), bool(brand)),
             ('params', len(params), opts.params_enabled),
             ('random', rnd, opts.random_enabled),
+            ('leaf', 4, True),
+            ('total_len', 8, True),
             ('V', 64, True),
             ('ciphertext', sample_len, True),
         ]
         total = sum(s for _, s, e in fields if e)
         self.diagram.set_fields(
             fields,
-            'пример: текст %d Б → пакет %d Б (оверхед +%d Б, %.0f%%)'
-            % (sample_len, total, total - sample_len,
-               100.0 * (total - sample_len) / sample_len))
+            'пример: текст %d Б → пакет %d Б (служебные поля +%d Б)'
+            % (sample_len, total, total - sample_len))
 
     def _build_example(self):
         if self.win.is_busy():
@@ -246,7 +252,7 @@ class PacketPage(QWidget):
             return
         data = self.ed_example.toPlainText().encode('utf-8')
 
-        def task(progress_cb):
+        def task(progress_cb, cancel):
             return engine.encrypt(st, data, progress=progress_cb)
 
         self.lbl_example_state.setText('собираю пример…')
@@ -257,11 +263,12 @@ class PacketPage(QWidget):
     def _on_example(self, res: engine.Result):
         self.btn_example.setEnabled(True)
         self.lbl_example_state.setText(
-            'пример собран: %s · %s · %d Б' %
-            (res.cipher, res.mode.upper(), len(res.data)))
+            'пример собран: %s · %s · формат v%d · %d Б'
+            % (res.cipher, res.mode.upper(), res.meta.get('version', 1),
+               len(res.data)))
         self.table.setRowCount(0)
         for f in res.fields:
-            if not f.size and f.name != 'ciphertext':
+            if not f.size and f.name not in ('ciphertext', 'brand'):
                 content = '— отключено —'
             elif f.name == 'params' and f.size:
                 content = f.data[2:].decode('ascii', 'replace')
@@ -269,6 +276,14 @@ class PacketPage(QWidget):
                 content = ('%s  «%s»' % (
                     f.data[:4].hex(' ').upper(),
                     f.data[4:].rstrip(b'\x00').decode('utf-8', 'replace')))
+            elif f.name == 'header' and f.size:
+                content = f.data.hex(' ').upper()
+            elif f.name == 'brand':
+                content = f.data.decode('utf-8', 'replace') or '—'
+            elif f.name == 'leaf' and f.size == 4:
+                content = '%d КиБ' % (int.from_bytes(f.data, 'big') // 1024)
+            elif f.name == 'total_len' and f.size == 8:
+                content = '%d Б' % int.from_bytes(f.data, 'big')
             else:
                 hexs = f.data.hex(' ').upper()
                 content = hexs if len(hexs) <= 96 else hexs[:96] + ' …'
@@ -292,7 +307,7 @@ class PacketPage(QWidget):
         self.table.setItem(r, 1, QTableWidgetItem(
             common.human_size(len(res.data))))
         self.table.setItem(r, 2, QTableWidgetItem(
-            'оверхед +%d Б' % res.meta.get('overhead', 0)))
+            'служебные поля +%d Б' % res.meta.get('overhead', 0)))
 
     def _on_example_err(self, exc):
         self.btn_example.setEnabled(True)

@@ -1,4 +1,5 @@
 # Разработка и тесты
 -r requirements.txt
+-r requirements-fast.txt
 pytest>=7.4
 pyflakes>=3.0

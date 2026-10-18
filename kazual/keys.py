@@ -62,9 +62,10 @@ def parse_raw_key_hex(text: str) -> bytes:
 
 def _stretch(spec, cipher_name: str, raw: bytes, domain: bytes,
              nbytes: int) -> bytes:
-    from .cipher.gorn import gorn_expand
+    from .cipher import _accel
     from .cipher.spec import TAG
-    return gorn_expand(raw, TAG + domain + cipher_name.encode('ascii'), nbytes)
+    return _accel.gorn_expand(raw, TAG + domain + cipher_name.encode('ascii'),
+                              nbytes)
 
 
 def siv_master_keys(spec, cipher_name: str, source, salt: bytes,

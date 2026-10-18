@@ -66,6 +66,9 @@ def apply_theme(app: QApplication) -> None:
     app.setStyleSheet(_QSS)
 
 
+from pathlib import Path as _Path
+_ASSETS = str(_Path(__file__).resolve().parents[2] / 'assets').replace('\\', '/')
+
 _QSS = '''
 * { outline: none; }
 
@@ -123,16 +126,18 @@ QComboBox QAbstractItemView {
     padding: 4px;
 }
 QSpinBox::up-button, QSpinBox::down-button {
-    background: transparent; border: none; width: 16px;
+    subcontrol-origin: border; width: 20px;
+    background: transparent; border: none;
 }
-QSpinBox::up-arrow {
-    image: none; border-left: 4px solid transparent;
-    border-right: 4px solid transparent; border-bottom: 5px solid %(muted)s;
-}
-QSpinBox::down-arrow {
-    image: none; border-left: 4px solid transparent;
-    border-right: 4px solid transparent; border-top: 5px solid %(muted)s;
-}
+QSpinBox::up-button { subcontrol-position: top right; height: 50%%; }
+QSpinBox::down-button { subcontrol-position: bottom right; height: 50%%; }
+QSpinBox::up-button:hover { background: %(card_alt)s; }
+QSpinBox::down-button:hover { background: %(card_alt)s; }
+QSpinBox::up-arrow { image: url("%(assets)s/spin_up.png"); width: 10px; height: 7px; }
+QSpinBox::down-arrow { image: url("%(assets)s/spin_down.png"); width: 10px; height: 7px; }
+QSpinBox::up-arrow:hover { image: url("%(assets)s/spin_up_hover.png"); }
+QSpinBox::down-arrow:hover { image: url("%(assets)s/spin_down_hover.png"); }
+QSpinBox::up-arrow:disabled, QSpinBox::down-arrow:disabled { image: none; }
 
 /* ---------- кнопки ---------- */
 QPushButton {
@@ -250,6 +255,7 @@ QFrame[kind="bannerWarn"] { background: #33270f; border: 1px solid #7a5a17; bord
 QFrame[kind="bannerErr"] { background: #36141d; border: 1px solid #7a2438; border-radius: 10px; }
 QFrame[kind="bannerInfo"] { background: %(card)s; border: 1px solid %(border)s; border-radius: 10px; }
 ''' % {
+    'assets': _ASSETS,
     'bg': BG, 'panel': PANEL, 'card': CARD, 'card_alt': CARD_ALT,
     'border': BORDER, 'text': TEXT, 'muted': MUTED, 'accent': ACCENT,
     'accent_hover': ACCENT_HOVER, 'accent_soft': ACCENT_SOFT, 'teal': TEAL,

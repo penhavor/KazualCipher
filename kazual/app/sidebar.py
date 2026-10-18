@@ -1,53 +1,36 @@
 # -*- coding: utf-8 -*-
 """
-Панель настроек (сайдабар): выбор шифра и режима списком, источник ключа,
-параметры Argon2id и тонкая настройка полей SIV-пакета (галочки + значения).
-Всё, что здесь меняется, мгновенно отражается на вкладке «Пакет» и
-сохраняется в QSettings (кроме пароля — он не сохраняется НИКОГДА).
+Панель настроек (сайдабар): шифр, режим, ключ, Argon2id и «Дополнительно»
+(формат пакета, бренд, поля params/random). Управляется словарём конфига
+(kazual.config): apply_config() / collect_config(). Всё, что меняется,
+мгновенно отражается на вкладке «Пакет» и автосохраняется.
+
+Для расшифровки контейнеров v2 панель умеет блокироваться: настройки
+читаются из файла, а не вводятся вручную (lock_from_detection/unlock).
+Пароль в конфиг не попадает НИКОГДА.
 """
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QPushButton, QSpinBox,
-                               QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QFrame,
+                               QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                               QPushButton, QSpinBox, QStackedWidget,
+                               QVBoxLayout, QWidget)
 
 from .. import engine
 from ..kdf import KdfParams
 from ..keys import PasswordKey, RawKey, parse_raw_key_hex, KeyMaterialError
-from ..modes.siv import (SivOptions, MAGIC, PREFIX_BYTES, RANDOM_BYTES,
-                         default_prefix_text, PacketFormatError)
+from ..modes.siv import SivOptions, MAGIC
 from . import theme
 
-_PRESETS = {
-    'По умолчанию (64 МиБ · 3 · 4)': KdfParams(65536, 3, 4),
-    'Быстрый (1 МиБ · 2 · 1)': KdfParams(1024, 2, 1),
-    'Максимум (256 МиБ · 4 · 4)': KdfParams(262144, 4, 4),
-}
-_CUSTOM_PRESET = 'Свои параметры…'
-
-
-def _two_line_item(lw: QListWidget, title: str, subtitle: str,
-                   height: int = 58) -> QListWidgetItem:
-    """Элемент списка «название + подпись» (шифры/режимы)."""
-    item = QListWidgetItem(lw)
-    item.setSizeHint(item.sizeHint().__class__(0, height))
-    w = QWidget()
-    v = QVBoxLayout(w)
-    v.setContentsMargins(8, 5, 8, 5)
-    v.setSpacing(1)
-    t = QLabel(title)
-    t.setStyleSheet('font-weight: 700; font-size: 11pt; background: transparent;')
-    s = QLabel(subtitle)
-    s.setWordWrap(True)
-    s.setStyleSheet('color: %s; font-size: 8.5pt; background: transparent;'
-                    % theme.MUTED)
-    v.addWidget(t)
-    v.addWidget(s)
-    lw.setItemWidget(item, w)
-    return item
+_PRESET_ITEMS = [
+    ('Стандартный — 64 МиБ · 3 прохода · 4 дорожки', 'balanced'),
+    ('Быстрый — 1 МиБ · 2 · 1 (тесты, слабые машины)', 'fast'),
+    ('Усиленный — 256 МиБ · 4 · 4 (медленный вход по паролю)', 'strong'),
+    ('Свои параметры…', 'custom'),
+]
+_PRESET_BY_ID = {pid: i for i, (_, pid) in enumerate(_PRESET_ITEMS)}
 
 
 class SettingsPanel(QWidget):
@@ -58,54 +41,79 @@ class SettingsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._loading = False
+        self._locked = False
         self._build()
         self._wire()
-        self._update_visibility()
+        self._refresh_dynamic()
 
     # ------------------------------------------------------------------ UI
+    @staticmethod
+    def _fit_combo(c):
+        """Комбобокс не растягивается по самому длинному пункту — иначе
+        сайдбар расползается и текст обрезается."""
+        from PySide6.QtWidgets import QComboBox
+        c.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        c.setMinimumContentsLength(18)
+        c.setToolTipDuration(-1)
+
     def _build(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(12)
+        root.setContentsMargins(0, 0, 8, 0)
+        root.setSpacing(10)
+
+        # ---- баннер блокировки (расшифровка: параметры из файла) ----
+        self.lock_banner = QLabel()
+        self.lock_banner.setWordWrap(True)
+        self.lock_banner.setStyleSheet(
+            'color: %s; background: #14321f; border: 1px solid #1f6b40;'
+            'border-radius: 8px; padding: 8px; font-size: 9pt;' % theme.SUCCESS)
+        self.lock_banner.hide()
+        root.addWidget(self.lock_banner)
 
         # ---- шифр ----
-        g_cipher = QGroupBox('Шифр')
-        v = QVBoxLayout(g_cipher)
-        self.lst_cipher = QListWidget()
+        g = QGroupBox('Шифр')
+        v = QVBoxLayout(g)
+        v.setSpacing(4)
+        self.cmb_cipher = QComboBox()
         for c in engine.CIPHERS:
-            _two_line_item(self.lst_cipher, c.name, c.subtitle, 78)
-        self.lst_cipher.setCurrentRow(0)
-        self.lst_cipher.setToolTip(
-            'Kazual-512 — рабочий шифр (блок/ключ 512 бит, 5 раундов).\n'
-            'Kazual-64 — учебная версия того же алгоритма (блок/ключ 64 бита,\n'
-            '2 раунда), пригодна для ручного счёта; НЕ для защиты данных.')
-        v.addWidget(self.lst_cipher)
-        root.addWidget(g_cipher)
+            self.cmb_cipher.addItem(c.name)
+        self._fit_combo(self.cmb_cipher)
+        v.addWidget(self.cmb_cipher)
+        self.lbl_cipher = QLabel()
+        self.lbl_cipher.setProperty('kind', 'muted')
+        self.lbl_cipher.setWordWrap(True)
+        self.lbl_cipher.setStyleSheet('font-size: 8.5pt;')
+        v.addWidget(self.lbl_cipher)
+        root.addWidget(g)
 
         # ---- режим ----
-        g_mode = QGroupBox('Режим работы')
-        v = QVBoxLayout(g_mode)
-        self.lst_mode = QListWidget()
-        _two_line_item(self.lst_mode, 'SIV',
-                       'аутентифицированное шифрование · пакет: prefix + params '
-                       '+ random + V + шифрограмма · рекомендуется', 96)
-        _two_line_item(self.lst_mode, 'ECB',
-                       'простой режим · блоки независимы · PKCS#7 · без '
-                       'проверки подлинности', 78)
-        self.lst_mode.setCurrentRow(0)
-        v.addWidget(self.lst_mode)
-        root.addWidget(g_mode)
+        g = QGroupBox('Режим')
+        v = QVBoxLayout(g)
+        v.setSpacing(4)
+        self.cmb_mode = QComboBox()
+        self.cmb_mode.addItem('SIV — с проверкой подлинности')
+        self.cmb_mode.addItem('ECB — простой (учебный)')
+        self._fit_combo(self.cmb_mode)
+        v.addWidget(self.cmb_mode)
+        self.lbl_mode = QLabel()
+        self.lbl_mode.setProperty('kind', 'muted')
+        self.lbl_mode.setWordWrap(True)
+        self.lbl_mode.setStyleSheet('font-size: 8.5pt;')
+        v.addWidget(self.lbl_mode)
+        root.addWidget(g)
 
         # ---- ключ ----
-        g_key = QGroupBox('Ключ')
-        v = QVBoxLayout(g_key)
+        g = QGroupBox('Ключ')
+        v = QVBoxLayout(g)
+        v.setSpacing(6)
         self.cmb_key_src = QComboBox()
-        self.cmb_key_src.addItem('Пароль (Argon2id)')
+        self.cmb_key_src.addItem('Пароль (через Argon2id)')
         self.cmb_key_src.addItem('Сырой ключ (hex)')
+        self._fit_combo(self.cmb_key_src)
         v.addWidget(self.cmb_key_src)
 
         self.stack_key = QStackedWidget()
-        # страница пароля
         pw = QWidget()
         hp = QHBoxLayout(pw)
         hp.setContentsMargins(0, 0, 0, 0)
@@ -115,42 +123,37 @@ class SettingsPanel(QWidget):
         self.btn_eye = QPushButton('показать')
         self.btn_eye.setProperty('kind', 'flat')
         self.btn_eye.setCheckable(True)
-        self.btn_eye.setFixedWidth(84)
+        self.btn_eye.setFixedWidth(86)
         self.btn_eye.setToolTip('Показать/скрыть пароль')
         hp.addWidget(self.ed_password, 1)
         hp.addWidget(self.btn_eye)
         self.stack_key.addWidget(pw)
-        # страница сырого ключа
+
         rk = QWidget()
         vr = QVBoxLayout(rk)
         vr.setContentsMargins(0, 0, 0, 0)
-        vr.setSpacing(4)
+        vr.setSpacing(3)
         self.ed_rawkey = QLineEdit()
         self.ed_rawkey.setFont(theme.mono_font(9))
         self.ed_rawkey.setPlaceholderText('deadbeef cafebabe …')
-        self.lbl_rawkey_hint = QLabel(
-            'любая длина · растягивается ГОРНом до %d бит' % 0)
-        self.lbl_rawkey_hint.setProperty('kind', 'muted')
-        self.lbl_rawkey_hint.setStyleSheet('font-size: 8.5pt;')
+        self.lbl_rawkey = QLabel()
+        self.lbl_rawkey.setStyleSheet('font-size: 8.5pt;')
+        self.lbl_rawkey.setWordWrap(True)
         vr.addWidget(self.ed_rawkey)
-        vr.addWidget(self.lbl_rawkey_hint)
+        vr.addWidget(self.lbl_rawkey)
         self.stack_key.addWidget(rk)
         v.addWidget(self.stack_key)
-        root.addWidget(g_key)
 
         # ---- KDF ----
-        self.g_kdf = QGroupBox('Параметры KDF — Argon2id')
-        v = QVBoxLayout(self.g_kdf)
-        v.setSpacing(6)
         self.cmb_preset = QComboBox()
-        for name in list(_PRESETS) + [_CUSTOM_PRESET]:
+        for name, _pid in _PRESET_ITEMS:
             self.cmb_preset.addItem(name)
+        self._fit_combo(self.cmb_preset)
         v.addWidget(self.cmb_preset)
-
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
-        form.setHorizontalSpacing(10)
-        form.setVerticalSpacing(6)
+        form.setHorizontalSpacing(8)
+        form.setVerticalSpacing(4)
         self.sp_m = QSpinBox()
         self.sp_m.setRange(8, 4 * 1024 * 1024)
         self.sp_m.setValue(65536)
@@ -160,114 +163,108 @@ class SettingsPanel(QWidget):
         self.sp_t = QSpinBox()
         self.sp_t.setRange(1, 1000)
         self.sp_t.setValue(3)
-        self.sp_t.setToolTip('t — число итераций (проходов)')
+        self.sp_t.setToolTip('t — число проходов')
         self.sp_p = QSpinBox()
         self.sp_p.setRange(1, 32)
         self.sp_p.setValue(4)
-        self.sp_p.setToolTip('p — параллелизм (дорожки/ядра)')
+        self.sp_p.setToolTip('p — параллелизм (дорожки)')
         form.addRow('m (память)', self.sp_m)
-        form.addRow('t (итерации)', self.sp_t)
-        form.addRow('p (параллелизм)', self.sp_p)
+        form.addRow('t (проходы)', self.sp_t)
+        form.addRow('p (дорожки)', self.sp_p)
         v.addLayout(form)
-
         self.lbl_phc = QLabel()
         self.lbl_phc.setFont(theme.mono_font(8))
         self.lbl_phc.setStyleSheet(
-            'color: %s; background: %s; border: 1px solid %s; border-radius: 6px;'
-            'padding: 4px 8px;' % (theme.TEAL, theme.CARD, theme.BORDER))
+            'color: %s; background: %s; border: 1px solid %s;'
+            'border-radius: 6px; padding: 3px 6px;'
+            % (theme.TEAL, theme.CARD, theme.BORDER))
         self.lbl_phc.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.lbl_phc.setToolTip('Эта строка сохраняется в файл (поле params) '
+                                'и при расшифровке берётся оттуда')
         v.addWidget(self.lbl_phc)
-        self.lbl_kdf_note = QLabel()
-        self.lbl_kdf_note.setProperty('kind', 'muted')
-        self.lbl_kdf_note.setStyleSheet('font-size: 8.5pt;')
-        self.lbl_kdf_note.setWordWrap(True)
-        v.addWidget(self.lbl_kdf_note)
-        root.addWidget(self.g_kdf)
+        root.addWidget(g)
 
-        # ---- пакет SIV ----
-        self.g_packet = QGroupBox('Пакет SIV')
-        v = QVBoxLayout(self.g_packet)
-        v.setSpacing(8)
+        # ---- дополнительно (сворачиваемое) ----
+        self.btn_adv = QPushButton('Дополнительно  ▾')
+        self.btn_adv.setProperty('kind', 'flat')
+        self.btn_adv.setCheckable(True)
+        self.btn_adv.setStyleSheet(
+            'text-align: left; padding: 8px 10px; font-weight: 600;'
+            'background: %s; border: 1px solid %s; border-radius: 8px;'
+            % (theme.PANEL, theme.BORDER))
+        root.addWidget(self.btn_adv)
 
-        self.ck_prefix = QCheckBox('prefix — магические байты + бренд')
-        self.ck_prefix.setToolTip(
-            'Форматный фильтр «свой/чужой, той ли версии» — как \\x89PNG у '
-            'картинок.\n256 бит: %s + текст, дополненный нулями.\nСам по себе '
-            'нулевая энтропия, но покрыт MAC\u2019ом.' % MAGIC.hex(' ').upper())
-        v.addWidget(self.ck_prefix)
-        self.ed_prefix = QLineEdit()
-        self.ed_prefix.setPlaceholderText(default_prefix_text('Kazual-512'))
-        self.ed_prefix.setToolTip('Текст после магических байт (бренд + версия)')
-        v.addWidget(self.ed_prefix)
-        self.lbl_prefix_info = QLabel()
-        self.lbl_prefix_info.setProperty('kind', 'muted')
-        self.lbl_prefix_info.setStyleSheet('font-size: 8.5pt;')
-        v.addWidget(self.lbl_prefix_info)
+        self.g_adv = QGroupBox('Тонкая настройка пакета')
+        va = QVBoxLayout(self.g_adv)
+        va.setSpacing(8)
 
-        self.ck_params = QCheckBox('params — PHC-строка Argon2id в пакете')
+        note = QLabel('Файлы сохраняются в самоопределяемом контейнере: '
+                      'при расшифровке шифр, режим и параметры читаются '
+                      'из самого файла — угадывать ничего не нужно.')
+        note.setProperty('kind', 'muted')
+        note.setWordWrap(True)
+        note.setStyleSheet('font-size: 8.5pt;')
+        va.addWidget(note)
+
+        va.addWidget(self._sep())
+        va.addWidget(QLabel('Бренд (метка в заголовке, необязательно):'))
+        self.ed_brand = QLineEdit()
+        self.ed_brand.setPlaceholderText('например: мои-архивы/v3')
+        va.addWidget(self.ed_brand)
+        self.lbl_brand = QLabel()
+        self.lbl_brand.setStyleSheet('font-size: 8.5pt;')
+        va.addWidget(self.lbl_brand)
+
+        self.ck_params = QCheckBox('Параметры KDF в файле (params)')
+        self.ck_params.setChecked(True)
         self.ck_params.setToolTip(
-            'Самоопписание KDF ($argon2id$m=…,t=…,p=…) с u16-длиной.\n'
-            'Поднимете m/t — старые пакеты останутся читаемыми.\n'
-            'Если выключить — расшифровать можно только с текущими '
-            'параметрами в этой панели.')
-        v.addWidget(self.ck_params)
+            'Сохранять PHC-строку Argon2id ($argon2id$m=…,t=…,p=…) в файл.\n'
+            'Тогда он сам расскажет, с какими параметрами создан, и\n'
+            'расшифровка не потребует ничего вспоминать. Рекомендуется.')
+        va.addWidget(self.ck_params)
 
-        self.ck_random = QCheckBox('random — соль/nonce, 256 бит')
+        self.ck_random = QCheckBox('Случайная соль (random)')
+        self.ck_random.setChecked(True)
+        self.lbl_random_note = QLabel()
+        self.lbl_random_note.setWordWrap(True)
         self.ck_random.setToolTip(
-            'Соль Argon2id: один пароль → разный мастер-ключ на каждое '
-            'сообщение;\nнаблюдатель не видит повторов. Безопасность от него '
-            'не зависит:\nесли ГСЧ сломается и random повторится, V всё равно '
-            'разведёт разные тексты (в этом суть SIV).')
-        v.addWidget(self.ck_random)
-        self.ed_fixed_random = QLineEdit()
-        self.ed_fixed_random.setFont(theme.mono_font(9))
-        self.ed_fixed_random.setPlaceholderText(
-            'фикс. значение: 64 hex-цифры (пусто = ГСЧ)')
-        self.ed_fixed_random.setToolTip(
-            'Необязательно: своё значение random вместо случайного —\n'
-            'для воспроизводимых тестов. 32 байта = 64 hex-цифры.')
-        v.addWidget(self.ed_fixed_random)
-
-        lbl_v = QLabel('V — 512 бит: синтетический nonce CTR и тег '
-                       'подлинности (MAC от всех полей + текста). Всегда в '
-                       'пакете.')
-        lbl_v.setProperty('kind', 'muted')
-        lbl_v.setStyleSheet('font-size: 8.5pt;')
-        lbl_v.setWordWrap(True)
-        v.addWidget(lbl_v)
-        root.addWidget(self.g_packet)
-
-        # ---- предупреждение для учебного шифра ----
-        self.lbl_edu = QLabel('⚠ Kazual-64 — учебный шифр: НЕ для защиты '
-                              'данных ни при каких условиях.')
-        self.lbl_edu.setWordWrap(True)
-        self.lbl_edu.setStyleSheet(
-            'color: %s; background: #33270f; border: 1px solid #7a5a17;'
-            'border-radius: 8px; padding: 8px; font-size: 9pt;' % theme.WARNING)
-        self.lbl_edu.hide()
-        root.addWidget(self.lbl_edu)
+            'Соль/nonce 256 бит: один и тот же пароль даёт разный ключ на\n'
+            'каждый файл — наблюдатель не видит повторов. Рекомендуется.\n'
+            'Снять галочку = детерминированный режим (нулевая соль).')
+        va.addWidget(self.ck_random)
+        va.addWidget(self.lbl_random_note)
+        self.g_adv.setVisible(False)
+        root.addWidget(self.g_adv)
 
         root.addStretch(1)
-        self._update_phc()
-        self._update_prefix_info()
+
+    def _sep(self) -> QFrame:
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet('color: %s; background: %s; max-height: 1px;'
+                           % (theme.BORDER, theme.BORDER))
+        return line
 
     # ------------------------------------------------------------- wiring
     def _wire(self):
-        self.lst_cipher.currentRowChanged.connect(self._on_changed)
-        self.lst_mode.currentRowChanged.connect(self._on_changed)
-        self.cmb_key_src.currentIndexChanged.connect(self._on_changed)
-        self.ed_password.textChanged.connect(self._on_changed)
+        self.btn_adv.toggled.connect(self._on_adv_toggle)
+        for w in (self.cmb_cipher, self.cmb_mode, self.cmb_key_src):
+            w.currentIndexChanged.connect(self._on_changed)
+        self.cmb_preset.currentIndexChanged.connect(self._on_preset)
+        self.ed_password.textChanged.connect(lambda *_: self.changed.emit())
         self.ed_rawkey.textChanged.connect(self._on_changed)
         self.btn_eye.toggled.connect(self._toggle_eye)
-        self.cmb_preset.currentIndexChanged.connect(self._apply_preset)
         for sp in (self.sp_m, self.sp_t, self.sp_p):
             sp.valueChanged.connect(self._on_spin_changed)
-        self.ck_prefix.toggled.connect(self._on_changed)
-        self.ed_prefix.textChanged.connect(self._on_prefix_text)
+        self.ed_brand.textChanged.connect(self._on_changed)
         self.ck_params.toggled.connect(self._on_changed)
         self.ck_random.toggled.connect(self._on_changed)
-        self.ed_fixed_random.textChanged.connect(self._on_changed)
+
+    def _on_adv_toggle(self, on: bool):
+        self.g_adv.setVisible(on)
+        self.btn_adv.setText('Дополнительно  ▴' if on
+                             else 'Дополнительно  ▾')
 
     def _toggle_eye(self, on: bool):
         self.ed_password.setEchoMode(
@@ -277,88 +274,112 @@ class SettingsPanel(QWidget):
 
     def _on_changed(self, *_):
         if not self._loading:
-            self._update_visibility()
+            self._refresh_dynamic()
             self.changed.emit()
-
-    def _on_prefix_text(self, *_):
-        self._update_prefix_info()
-        self._on_changed()
 
     def _on_spin_changed(self, *_):
         if self._loading:
             return
-        # m ≥ 8·p — граница Argon2; мягко подводим пресет к «Свои»
         if self.sp_m.value() < 8 * self.sp_p.value():
             self.sp_m.blockSignals(True)
             self.sp_m.setValue(8 * self.sp_p.value())
             self.sp_m.blockSignals(False)
-        self._apply_preset(self.cmb_preset.count() - 1)   # «Свои параметры…»
-        self._update_phc()
+        # ручная правка → пресет «Свои»
+        idx = self.cmb_preset.count() - 1
+        if self.cmb_preset.currentIndex() != idx:
+            self.cmb_preset.blockSignals(True)
+            self.cmb_preset.setCurrentIndex(idx)
+            self.cmb_preset.blockSignals(False)
+        self._refresh_dynamic()
         self.changed.emit()
 
-    def _apply_preset(self, idx: int):
-        name = self.cmb_preset.itemText(idx)
-        if name in _PRESETS:
-            p = _PRESETS[name]
-            self._loading = True
-            self.sp_m.setValue(p.memory_kib)
-            self.sp_t.setValue(p.iterations)
-            self.sp_p.setValue(p.parallelism)
-            self._loading = False
-        self._update_phc()
-        if not self._loading:
-            self._update_visibility()
-            self.changed.emit()
-
-    def _update_phc(self):
-        self.lbl_phc.setText(self.kdf_params().phc_string())
-
-    def _update_prefix_info(self):
-        text = self.prefix_text() or default_prefix_text(self.cipher_name())
-        n = len(MAGIC) + len(text.encode('utf-8'))
-        ok = n <= PREFIX_BYTES
-        self.lbl_prefix_info.setText(
-            '%s: %s + «%s» = %d из %d байт%s' % (
-                '✓' if ok else '✗', MAGIC.hex(' ').upper(), text, n,
-                PREFIX_BYTES, '' if ok else ' — СОКРАТИТЕ ТЕКСТ'))
-        self.lbl_prefix_info.setStyleSheet(
-            'font-size: 8.5pt; color: %s;' % (theme.MUTED if ok else theme.DANGER))
-        self.ed_prefix.setStyleSheet('' if ok else 'border: 1px solid %s;'
-                                     % theme.DANGER)
-
-    def _update_visibility(self):
-        siv = self.mode() == 'siv'
+    # ----------------------------------------------------------- динамика
+    def _refresh_dynamic(self):
+        """Подписи, валидация и видимость — по текущим значениям."""
+        info = engine.CIPHERS[self.cmb_cipher.currentIndex()]
+        self.lbl_cipher.setText(info.subtitle)
+        siv = self.cmb_mode.currentIndex() == 0
+        self.lbl_mode.setText(
+            'Пакет: заголовок + тег подлинности V + шифрограмма. Любая '
+            'подмена байта обнаруживается.' if siv else
+            'Независимые блоки + PKCS#7, без проверки подлинности. '
+            'Учебно-демонстрационный режим.')
         password = self.cmb_key_src.currentIndex() == 0
         self.stack_key.setCurrentIndex(0 if password else 1)
-        self.g_packet.setVisible(siv)
-        self.g_kdf.setVisible(password)
-        self.lbl_edu.setVisible(self.cipher_name() == 'Kazual-64')
-        self.lbl_rawkey_hint.setText(
-            'любая длина · растягивается ГОРНом до %d бит'
-            % (engine.CIPHER_BY_NAME[self.cipher_name()].key_bits))
-        if siv:
-            self.lbl_kdf_note.setText(
-                'Записываются в поле params пакета' if self.ck_params.isChecked()
-                else 'НЕ записываются в пакет — расшифровка только с ними же')
+        self.cmb_preset.setEnabled(password)
+        self.sp_m.setEnabled(password and self._is_custom_preset())
+        self.sp_t.setEnabled(password and self._is_custom_preset())
+        self.sp_p.setEnabled(password and self._is_custom_preset())
+        self.lbl_phc.setVisible(password)
+        self.lbl_phc.setText(self.kdf_params().phc_string())
+
+        # сырой ключ — живая валидация
+        raw = self.ed_rawkey.text().strip()
+        if not raw:
+            self.lbl_rawkey.setText('любая длина · растягивается ГОРНом до '
+                                    '%d бит' % info.key_bits)
+            self.lbl_rawkey.setStyleSheet('font-size: 8.5pt; color: %s;'
+                                          % theme.MUTED)
         else:
-            self.lbl_kdf_note.setText(
-                'ECB не хранит параметры: расшифровка — только с теми же')
-        self._update_prefix_info()
+            try:
+                b = parse_raw_key_hex(raw)
+                self.lbl_rawkey.setText('✓ %d байт · растягивается ГОРНом до '
+                                        '%d бит' % (len(b), info.key_bits))
+                self.lbl_rawkey.setStyleSheet('font-size: 8.5pt; color: %s;'
+                                              % theme.SUCCESS)
+            except KeyMaterialError as exc:
+                self.lbl_rawkey.setText('✗ %s' % exc)
+                self.lbl_rawkey.setStyleSheet('font-size: 8.5pt; color: %s;'
+                                              % theme.DANGER)
+
+        # бренд — счётчик байт
+        if True:
+            n = len(self.ed_brand.text().encode('utf-8'))
+            if n == 0:
+                self.lbl_brand.setText('пусто — бренд не записывается')
+                self.lbl_brand.setStyleSheet('font-size: 8.5pt; color: %s;'
+                                             % theme.MUTED)
+            elif n <= 255:
+                self.lbl_brand.setText('✓ %d из 255 байт' % n)
+                self.lbl_brand.setStyleSheet('font-size: 8.5pt; color: %s;'
+                                             % theme.SUCCESS)
+            else:
+                self.lbl_brand.setText('✗ %d байт — максимум 255, сократите'
+                                       % n)
+                self.lbl_brand.setStyleSheet('font-size: 8.5pt; color: %s;'
+                                             % theme.DANGER)
+
+        # random: только галочка — либо случайная соль, либо детерминизм
+        self.lbl_random_note.setText(
+            'галочка снята: полный детерминизм (нулевая соль) — одинаковые '
+            'данные и ключ дадут одинаковый файл'
+            if not self.ck_random.isChecked() else
+            'соль генерируется случайно на каждый файл')
+        self.lbl_random_note.setStyleSheet(
+            'font-size: 8.5pt; color: %s;'
+            % (theme.WARNING if not self.ck_random.isChecked()
+               else theme.MUTED))
+
+    def _update_prefix_hint(self):
+        self.ed_brand.setToolTip(
+            'Текст-метка в заголовке контейнера (до 255 байт). Заголовок '
+            'любого файла начинается с магических байтов %s — по ним '
+            'формат узнаётся автоматически.' % MAGIC.hex(' ').upper())
+
+    def _is_custom_preset(self) -> bool:
+        return self.cmb_preset.currentIndex() == self.cmb_preset.count() - 1
 
     # -------------------------------------------------------------- API
     def cipher_name(self) -> str:
-        return engine.CIPHERS[self.lst_cipher.currentRow()].name
+        return engine.CIPHERS[self.cmb_cipher.currentIndex()].name
 
     def mode(self) -> str:
-        return 'siv' if self.lst_mode.currentRow() == 0 else 'ecb'
+        return 'siv' if self.cmb_mode.currentIndex() == 0 else 'ecb'
 
     def kdf_params(self) -> KdfParams:
         return KdfParams(memory_kib=self.sp_m.value(),
                          iterations=self.sp_t.value(),
                          parallelism=self.sp_p.value())
-
-    def prefix_text(self) -> str:
-        return self.ed_prefix.text().strip()
 
     def key_source(self):
         if self.cmb_key_src.currentIndex() == 0:
@@ -369,89 +390,159 @@ class SettingsPanel(QWidget):
             return PasswordKey(pw)
         raw = self.ed_rawkey.text()
         if not raw.strip():
-            raise engine.KazualError('введите сырой ключ в hex '
-                                     '(или переключитесь на пароль)')
+            raise engine.KazualError('введите сырой ключ в hex (или '
+                                     'переключитесь на пароль)')
         try:
             return RawKey(parse_raw_key_hex(raw))
         except KeyMaterialError as exc:
-            raise engine.KazualError(str(exc)) from exc
+            raise engine.KazualError('сырой ключ: %s' % exc) from exc
 
     def siv_options(self) -> SivOptions:
-        """Настройки пакета без валидации ключа — для живой схемы «Пакет»."""
+        """Настройки пакета (без валидации ключа) — для схемы и движка."""
         return SivOptions(
-            prefix_enabled=self.ck_prefix.isChecked(),
-            prefix_text=self.prefix_text() or None,
+            prefix_enabled=bool(self.ed_brand.text().strip()),
+            prefix_text=self.ed_brand.text().strip() or None,
             params_enabled=self.ck_params.isChecked(),
             kdf_params=self.kdf_params(),
             random_enabled=self.ck_random.isChecked(),
-            fixed_random_hex=self.ed_fixed_random.text().strip(),
+            leaf_size=self._leaf_size,
         )
 
     def settings(self) -> engine.Settings:
         """Собрать настройки; при ошибке ввода — engine.KazualError с текстом."""
         siv = self.siv_options()
-        # ранняя валидация полей пакета — до тяжёлых операций
-        name = self.cipher_name()
-        try:
-            siv.resolve_prefix(name)
-            if siv.fixed_random_hex and siv.random_enabled:
-                fixed = bytes.fromhex(''.join(siv.fixed_random_hex.split()))
-                if len(fixed) != RANDOM_BYTES:
-                    raise ValueError('нужно ровно %d байт' % RANDOM_BYTES)
-        except (PacketFormatError, ValueError) as exc:
-            raise engine.KazualError('настройки пакета: %s' % exc) from exc
-        st = engine.Settings(cipher=name, mode=self.mode(),
+        if len((siv.prefix_text or '').encode('utf-8')) > 255:
+            raise engine.KazualError('бренд длиннее 255 байт — сократите '
+                                     'текст в «Дополнительно»')
+        st = engine.Settings(cipher=self.cipher_name(), mode=self.mode(),
                              source=self.key_source(),
-                             kdf_params=self.kdf_params(), siv=siv)
+                             kdf_params=self.kdf_params(), siv=siv,
+                             backend=self._backend, threads=self._threads,
+                             small_file_mib=self._small_file_mib)
         st.validate()
         return st
 
-    # ------------------------------------------- persistence (QSettings)
-    def save_state(self) -> dict:
-        return {
-            'cipherRow': self.lst_cipher.currentRow(),
-            'modeRow': self.lst_mode.currentRow(),
-            'keySrc': self.cmb_key_src.currentIndex(),
-            'rawkey': self.ed_rawkey.text(),
-            'm': self.sp_m.value(), 't': self.sp_t.value(),
-            'p': self.sp_p.value(),
-            'prefixOn': self.ck_prefix.isChecked(),
-            'prefixText': self.ed_prefix.text(),
-            'paramsOn': self.ck_params.isChecked(),
-            'randomOn': self.ck_random.isChecked(),
-            'fixedRandom': self.ed_fixed_random.text(),
-        }
+    # runtime-параметры производительности подставляет окно из конфига
+    _backend = 'auto'
+    _threads = 0
+    _small_file_mib = 32
+    _leaf_size = 4 * 1024 * 1024
 
-    def load_state(self, s: dict):
+    def set_performance(self, backend: str, threads: int, leaf_mib: int,
+                        small_file_mib: int):
+        self._backend = backend
+        self._threads = threads
+        self._leaf_size = max(64, leaf_mib * 1024 * 1024)
+        self._small_file_mib = small_file_mib
+
+    # ----------------------------------------------------- config binding
+    def apply_config(self, cfg: dict):
+        """Выставить виджеты по конфигу (без сигналов changed)."""
         self._loading = True
         try:
-            self.lst_cipher.setCurrentRow(int(s.get('cipherRow', 0)))
-            self.lst_mode.setCurrentRow(int(s.get('modeRow', 0)))
-            self.cmb_key_src.setCurrentIndex(int(s.get('keySrc', 0)))
-            self.ed_rawkey.setText(s.get('rawkey', ''))
-            params = KdfParams(int(s.get('m', 65536)), int(s.get('t', 3)),
-                               int(s.get('p', 4)))
-            preset_hit = next((i for i, (nm, p) in enumerate(_PRESETS.items())
-                               if p == params), None)
+            self.cmb_cipher.setCurrentIndex(
+                0 if cfg.get('cipher', 'Kazual-512') == 'Kazual-512' else 1)
+            self.cmb_mode.setCurrentIndex(0 if cfg.get('mode') == 'siv' else 1)
+            self.cmb_key_src.setCurrentIndex(
+                0 if cfg.get('key_source', 'password') == 'password' else 1)
+            self.ed_rawkey.setText(cfg.get('raw_key_hex', ''))
+            m, t, p = int(cfg.get('kdf_m', 65536)), int(cfg.get('kdf_t', 3)), \
+                int(cfg.get('kdf_p', 4))
+            preset = cfg.get('kdf_preset', 'balanced')
+            if preset in ('balanced', 'fast', 'strong'):
+                from ..config import KDF_PRESETS
+                pm, pt, pp = KDF_PRESETS[preset]
+                if (pm, pt, pp) != (m, t, p):
+                    preset = 'custom'
             self.cmb_preset.setCurrentIndex(
-                preset_hit if preset_hit is not None
-                else self.cmb_preset.count() - 1)
-            if preset_hit is None:
-                self.sp_m.setValue(params.memory_kib)
-                self.sp_t.setValue(params.iterations)
-                self.sp_p.setValue(params.parallelism)
-            self.ck_prefix.setChecked(s.get('prefixOn', True))
-            self.ed_prefix.setText(s.get('prefixText', ''))
-            self.ck_params.setChecked(s.get('paramsOn', True))
-            self.ck_random.setChecked(s.get('randomOn', True))
-            self.ed_fixed_random.setText(s.get('fixedRandom', ''))
+                _PRESET_BY_ID.get(preset, 0))
+            self.sp_m.setValue(m)
+            self.sp_t.setValue(t)
+            self.sp_p.setValue(p)
+            self.ed_brand.setText(cfg.get('brand_text', ''))
+            self.ck_params.setChecked(bool(cfg.get('params_enabled', True)))
+            self.ck_random.setChecked(bool(cfg.get('random_enabled', True)))
+            self.set_performance(cfg.get('backend', 'auto'),
+                                 int(cfg.get('threads', 0)),
+                                 int(cfg.get('leaf_mib', 4)),
+                                 int(cfg.get('small_file_mib', 32)))
+            self.btn_adv.setChecked(bool(cfg.get('advanced_open', False)))
         finally:
             self._loading = False
-        self._update_visibility()
-        self._update_phc()
+        self._refresh_dynamic()
 
-    def set_defaults(self):
-        """Значения по умолчанию (первый запуск)."""
-        self.ck_prefix.setChecked(True)
-        self.ck_params.setChecked(True)
-        self.ck_random.setChecked(True)
+    def collect_config(self) -> dict:
+        """Собрать изменения виджетов в словарь (для записи в конфиг)."""
+        from ..config import KDF_PRESETS
+        preset_idx = self.cmb_preset.currentIndex()
+        preset = _PRESET_ITEMS[preset_idx][1]
+        if preset != 'custom':
+            m, t, p = KDF_PRESETS[preset]
+            # если спин-ы расходятся с пресетом — это «custom»
+            if (m, t, p) != (self.sp_m.value(), self.sp_t.value(),
+                             self.sp_p.value()):
+                preset = 'custom'
+        return {
+            'cipher': self.cipher_name(),
+            'mode': self.mode(),
+            'key_source': 'password' if self.cmb_key_src.currentIndex() == 0
+                          else 'hex',
+            'raw_key_hex': self.ed_rawkey.text().strip(),
+            'kdf_preset': preset,
+            'kdf_m': self.sp_m.value(),
+            'kdf_t': self.sp_t.value(),
+            'kdf_p': self.sp_p.value(),
+            'brand_text': self.ed_brand.text().strip(),
+            'params_enabled': self.ck_params.isChecked(),
+            'random_enabled': self.ck_random.isChecked(),
+            'advanced_open': self.btn_adv.isChecked(),
+        }
+
+    # --------------------------------------------------------------- lock
+    def lock_from_detection(self, title: str, body: str = ''):
+        """Заблокировать панель: параметры читаются из файла."""
+        self._locked = True
+        for w in (self.cmb_cipher, self.cmb_mode, self.cmb_preset,
+                  self.sp_m, self.sp_t, self.sp_p,
+                  self.ed_brand, self.ck_params, self.ck_random,
+                  self.btn_adv):
+            w.setEnabled(False)
+        self.lock_banner.setText(
+            '<b>Параметры считаны из файла.</b> Панель заблокирована: шифр, '
+            'режим и KDF взяты из расшифровываемого файла (подробности — в '
+            'карточке на странице).')
+        self.lock_banner.show()
+
+    def unlock(self):
+        self._locked = False
+        for w in (self.cmb_cipher, self.cmb_mode, self.cmb_preset,
+                  self.sp_m, self.sp_t, self.sp_p,
+                  self.ed_brand, self.ck_params, self.ck_random,
+                  self.btn_adv):
+            w.setEnabled(True)
+        self._refresh_dynamic()
+        self.lock_banner.hide()
+
+    def is_locked(self) -> bool:
+        return self._locked
+
+    def _on_preset(self, idx: int):
+        """Выбран пресет — проставить m/t/p и обновить вид."""
+        if self._loading:
+            return
+        self._apply_preset_selection(idx)
+        self._refresh_dynamic()
+        self.changed.emit()
+
+    def _apply_preset_selection(self, idx: int):
+        from ..config import KDF_PRESETS
+        pid = _PRESET_ITEMS[idx][1]
+        if pid in KDF_PRESETS:
+            m, t, p = KDF_PRESETS[pid]
+            self._loading = True
+            try:
+                self.sp_m.setValue(m)
+                self.sp_t.setValue(t)
+                self.sp_p.setValue(p)
+            finally:
+                self._loading = False

@@ -5,8 +5,12 @@
 таблиц F и H. §8 спецификации.
 """
 
+import hashlib
+import threading
+from collections import OrderedDict
+
 from .gf import MUL8T, MUL16, mds_rows, mds_apply
-from .gorn import gorn_hash, gorn_expand
+from . import _accel
 from .sbox import SBOXES
 from .forge import (Reader, multiset_from_int, multiset_seed_bytes,
                     perm_seed_bytes, read_perm)
@@ -29,7 +33,7 @@ def _ks_tables(spec, X, r):
     nb_phi = (k // 2) * multiset_seed_bytes(pat)
     nb_aff = (k // 2) * brlen * 2
     nb_pr = 2 * perm_seed_bytes(spec.ks_bytes)
-    mat = gorn_expand(X + r.to_bytes(2, 'big'), TAG + b'/KS-TBL',
+    mat = _accel.gorn_expand(X + r.to_bytes(2, 'big'), TAG + b'/KS-TBL',
                       nb_phi + nb_aff + nb_pr + 16)
     rd = Reader(mat)
     kt = KSTables()
@@ -70,7 +74,7 @@ def _round_consts(spec):
     key = (spec.name, spec.cw_r)
     t = _RC.get(key)
     if t is None:
-        t = _RC[key] = [gorn_expand(r.to_bytes(4, 'big'), TAG + b'/KS-RC', spec.ks_bytes)
+        t = _RC[key] = [_accel.gorn_expand(r.to_bytes(4, 'big'), TAG + b'/KS-RC', spec.ks_bytes)
                         for r in range(spec.cw_r)]
     return t
 
@@ -81,7 +85,7 @@ _INIT = {}
 def _init_const(spec):
     t = _INIT.get(spec.name)
     if t is None:
-        t = _INIT[spec.name] = gorn_hash(b'', TAG + b'/KS-INIT/' + spec.name.encode())[:spec.ks_bytes]
+        t = _INIT[spec.name] = _accel.gorn_hash(b'', TAG + b'/KS-INIT/' + spec.name.encode())[:spec.ks_bytes]
     return t
 
 
@@ -101,12 +105,40 @@ class KeyMat:
                  'material', 'used', 'trace', 'bctx')
 
 
+# LRU-кэш расписаний: повторные операции с тем же ключом (пакет файлов,
+# повторная расшифровка) не платят ~0.2–0.5 с за пересборку таблиц.
+_KS_CACHE = OrderedDict()
+_KS_CACHE_MAX = 4
+_KS_LOCK = threading.Lock()
+
+
 def key_schedule(spec, K, trace=False):
-    """KeySchedule(K) → km: забеливание, 6 пол-раундов H, 5 функций F."""
+    """KeySchedule(K) → km: забеливание, 6 пол-раундов H, 5 функций F.
+
+    Результат кэшируется по (spec, K) — до _KS_CACHE_MAX расписаний;
+    km.bctx дополнительно хранит готовые векторные/нативные контексты.
+    """
     if len(K) != spec.ks_bytes:
         raise ValueError('ключ: ожидалось %d байт, дано %d' % (spec.ks_bytes, len(K)))
+    if not trace:
+        ck = (spec.name, hashlib.sha256(K).digest())
+        with _KS_LOCK:
+            km = _KS_CACHE.get(ck)
+            if km is not None:
+                _KS_CACHE.move_to_end(ck)
+                return km
+    km = _key_schedule_build(spec, K, trace)
+    if not trace:
+        with _KS_LOCK:
+            _KS_CACHE[ck] = km
+            while len(_KS_CACHE) > _KS_CACHE_MAX:
+                _KS_CACHE.popitem(last=False)
+    return km
+
+
+def _key_schedule_build(spec, K, trace=False):
     nb = spec.ks_bytes
-    Z = gorn_hash(K, TAG + b'/KS0')[:nb]                          # Стадия 0
+    Z = _accel.gorn_hash(K, TAG + b'/KS0')[:nb]                          # Стадия 0
     Y = bytes(a ^ b for a, b in zip(mds_apply(Z, _base_rows(spec)), _init_const(spec)))
     X = Z                                                          # Стадия 1
     RC = _round_consts(spec)

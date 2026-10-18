@@ -288,13 +288,17 @@ def selftest():
     def _counting(state):
         cnt[0] += 1
         return _g(state)
+    from . import _accel
     _sched._INIT.clear()
     _sched._RC.clear()
+    _hooks_backup = dict(_accel.HOOKS)
+    _accel.HOOKS.clear()          # счёт справедливл для эталонного пути
     _gorn.gorn_perm = _counting
     try:
         key_schedule(FULL, os.urandom(64))
     finally:
         _gorn.gorn_perm = _g
+        _accel.HOOKS.update(_hooks_backup)
     allok &= _chk(cnt[0] == 385, 'перестановок ГОРНа на ключ: %d (+6 одноразовых глобальных = 391)' % cnt[0])
 
     print('\n§10  ПАКЕТНЫЙ ПУТЬ (NumPy/CuPy)')
@@ -526,3 +530,45 @@ def bench():
         print('   шифрование ............ %8.1f мс  = %.2f МБ/с' % (tg2 * 1000, B2 * 64 / tg2 / 1e6))
     else:
         print('\nпакетный путь CuPy (GPU): недоступен (pip install cupy + CUDA — ускорение ещё в 10+ раз)')
+
+def bench_native(size_mib: int = 32):
+    """Замер нативного пути (numba JIT): CTR, tree-MAC, полный цикл SIV."""
+    from . import _accel
+    from .batch import native_ctx
+    print('\n' + '=' * 78)
+    print('НАТИВНЫЙ ПУТЬ (numba JIT, машинный код, все ядра CPU)')
+    print('=' * 78)
+    print('ускоритель: %s' % _accel.status_line())
+    _accel.warmup()
+    K = os.urandom(64)
+    km = key_schedule(FULL, K)
+    nc = native_ctx(FULL, km)
+    if nc is None:
+        print('   native-контекст недоступен (numba не установлена) — '
+              'работает эталонный/NumPy-путь')
+        return
+    data = os.urandom(64 * 16384)
+    nc.encrypt_blocks(data)                      # прогрев JIT
+    t = time.time()
+    for _ in range(5):
+        nc.encrypt_blocks(data)
+    te = (time.time() - t) / 5
+    print('\nшифрование блоков Kazual-512 (parallel):')
+    print('   1 МиБ ................. %8.1f мс  = %.1f МиБ/с'
+          % (te * 1000, 1.0 / te))
+    big = os.urandom(size_mib * 1024 * 1024)
+    t = time.time()
+    _accel.gorn_hash(big, b'bench')
+    tg = time.time() - t
+    print('ГОРН-дайджест (последовательно, 1 поток):')
+    print('   %d МиБ ................ %8.2f с   = %.1f МиБ/с'
+          % (size_mib, tg, size_mib / tg))
+    from ..modes.mac import tree_mac
+    t = time.time()
+    tree_mac(K, 'Kazual-512', b'', b'', b'', big, 4 << 20, threads=0)
+    tt = time.time() - t
+    print('tree-MAC (параллельно, все ядра):')
+    print('   %d МиБ ................ %8.2f с   = %.1f МиБ/с'
+          % (size_mib, tt, size_mib / tt))
+    print('\nитого для файлов: узкое место — дисковая подсистема; '
+          '10 ГиБ SIV ≈ 2 прохода чтения + 1 запись.')

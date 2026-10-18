@@ -43,7 +43,10 @@ def test_warnings_for_disabled_fields():
     text = ' '.join(r.warnings)
     assert 'детерминировано' in text
     assert 'params не сохраняются' in text
-    assert 'prefix отключён' in text
+    # v1.1: предупреждение «prefix отключён» убрано сознательно — контейнер
+    # v2 самоописуем, а единственное полное предупреждение о природе шифра
+    # живёт на странице «О шифре» (меньше назойливости).
+    assert 'prefix отключён' not in text
 
 
 def test_empty_password_rejected():

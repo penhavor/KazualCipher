@@ -5,34 +5,38 @@ kazual.engine — высокоуровневый фасад: «настройк�
 
     settings = Settings(cipher='Kazual-512', mode='siv', source=PasswordKey('…'),
                         siv=SivOptions(...))
-    res = encrypt(settings, plaintext, progress=cb)   # res.data — пакет
+    res = encrypt(settings, plaintext, progress=cb)   # res.data — контейнер
     res = decrypt(settings, packet, progress=cb)      # res.data — текст
 
-Результат всегда сопровождается разобранными полями пакета (для
-визуализации) и мета-информацией (тайминги, V, PHC-строка, предупреждения).
+Файлы (в том числе огромные — поток с постоянным ОЗУ, все ядра CPU):
+
+    from kazual import stream
+    rep = stream.encrypt_file(settings, 'big.iso', 'big.iso.kaz', progress)
+    reps = stream.encrypt_files(settings, [(src, dst), …], progress, cancel)
+
+Расшифровка САМА определяет формат по содержимому: контейнер v2 несёт в
+заголовке шифр, режим, параметры Argon2id и состав полей — настройки
+панели для него не используются (только пароль/ключ).
 """
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
-from .cipher.spec import SPECS, FULL, K64
+from .cipher.spec import SPECS
 from .kdf import KdfParams, DEFAULT_KDF_PARAMS
-from .keys import (KeySource, PasswordKey, RawKey, KeyMaterialError,
-                   siv_master_keys, mode_key)
-from .modes.siv import (SivOptions, SivResult, PacketField, encrypt_siv,
-                        decrypt_siv)
+from .keys import KeySource, PasswordKey, RawKey
+from .modes.siv import SivOptions, SivResult, PacketField
+from .modes.siv2 import (encrypt_siv2, decrypt_siv2, encrypt_ecb2,
+                         decrypt_ecb2)
 from .modes.ecb import encrypt_ecb, decrypt_ecb, EcbResult
+from .modes import container as ct
 from .modes.padding import PaddingError                      # noqa: F401 (реэкспорт)
 from .modes.siv import MacError, PacketFormatError            # noqa: F401 (реэкспорт)
 
-__all__ = ['CipherInfo', 'CIPHERS', 'MODES', 'Settings', 'Result',
-           'encrypt', 'decrypt', 'KazualError']
-
-_ZERO_SALT = b'\x00' * 32   # ECB: контейнера для random нет — соль нулевая
-
+__all__ = ['CipherInfo', 'CIPHERS', 'CIPHER_BY_NAME', 'MODES', 'Settings',
+           'Result', 'encrypt', 'decrypt', 'KazualError']
 
 class KazualError(Exception):
     """Базовая ошибка движка (GUI показывает её текст дословно)."""
@@ -57,13 +61,13 @@ CIPHERS: List[CipherInfo] = [
     CipherInfo('Kazual-512', 512, 512, 5, False,
                'блок 512 бит · ключ 512 бит · 5 тяжёлых раундов'),
     CipherInfo('Kazual-64', 64, 64, 2, True,
-               'блок 64 бита · ключ 64 бита · 2 раунда — учебный, НЕ для защиты'),
+               'блок 64 бита · ключ 64 бита · 2 раунда — учебный'),
 ]
 CIPHER_BY_NAME = {c.name: c for c in CIPHERS}
 
 MODES = {
     'siv': 'SIV — аутентифицированное шифрование (рекомендуется)',
-    'ecb': 'ECB — простой режим без аутентификации',
+    'ecb': 'ECB — простой режим без аутентификации (учебный)',
 }
 
 
@@ -75,7 +79,9 @@ class Settings:
     source: KeySource = field(default_factory=lambda: PasswordKey(''))
     kdf_params: KdfParams = field(default_factory=lambda: DEFAULT_KDF_PARAMS)
     siv: SivOptions = field(default_factory=SivOptions)
-    backend: str = 'auto'                    # auto | cpu | gpu | scalar
+    backend: str = 'auto'                    # auto|native|cpu|gpu|scalar
+    threads: int = 0                         # 0 = все ядра
+    small_file_mib: int = 32                 # порог «в памяти» для файлов
 
     def validate(self) -> None:
         if self.cipher not in CIPHER_BY_NAME:
@@ -89,13 +95,13 @@ class Settings:
         self.kdf_params.validate()
 
     def effective_siv_options(self) -> SivOptions:
-        """SivOptions с актуальными KDF-параметрами из сайдбара."""
+        """SivOptions с актуальными KDF-параметрами из настроек."""
         o = self.siv
         return SivOptions(
             prefix_enabled=o.prefix_enabled, prefix_text=o.prefix_text,
             params_enabled=o.params_enabled, kdf_params=self.kdf_params,
             random_enabled=o.random_enabled,
-            fixed_random_hex=o.fixed_random_hex)
+            leaf_size=o.leaf_size)
 
 
 @dataclass
@@ -109,29 +115,27 @@ class Result:
     warnings: List[str]
 
 
-def _collect_warnings(st: Settings) -> List[str]:
+def _collect_warnings(st: Settings, cipher: Optional[str] = None,
+                      mode: Optional[str] = None) -> List[str]:
+    """Функциональные предупреждения (без повторяющейся «страшилки» —
+    одно полное предупреждение о природе шифра живёт в «О шифре»)."""
     w: List[str] = []
-    info = CIPHER_BY_NAME[st.cipher]
+    info = CIPHER_BY_NAME[cipher or st.cipher]
     if info.educational:
-        w.append('Kazual-64 — учебный шифр: 64-битный ключ и блок. '
-                 'НЕ предназначен для защиты данных.')
-    if st.mode == 'ecb':
+        w.append('Kazual-64 — учебный шифр (64-битные блок и ключ), '
+                 'не для защиты данных.')
+    mode = mode or st.mode
+    if mode == 'ecb':
         w.append('ECB: нет проверки подлинности; одинаковые открытые блоки '
                  'дают одинаковые шифроблоки.')
-        if isinstance(st.source, PasswordKey):
-            w.append('ECB с паролем: соль нулевая (контейнера для random '
-                     'нет) — один пароль всегда даёт один ключ.')
     else:
         o = st.effective_siv_options()
         if not o.random_enabled:
-            w.append('random отключён: шифрование детерминировано (нулевая '
-                     'соль), одинаковый текст даёт одинаковый пакет.')
+            w.append('random отключён: шифрование детерминировано — '
+                     'одинаковые данные дают одинаковый пакет.')
         if not o.params_enabled:
-            w.append('params не сохраняются в пакет: расшифровать можно '
-                     'только с теми же параметрами Argon2id в настройках.')
-        if not o.prefix_enabled:
-            w.append('prefix отключён: пакет лишён форматного фильтра '
-                     '«свой/чужой» (на защиту это не влияет — V покрывает всё).')
+            w.append('params не сохраняются в файл: расшифровать можно '
+                     'только с теми же параметрами Argon2id.')
     return w
 
 
@@ -142,29 +146,19 @@ def _spec(st: Settings):
 def encrypt(st: Settings, data: bytes,
             progress: Optional[Callable[[str, Optional[float]], None]] = None,
             ) -> Result:
-    """Зашифровать данные согласно настройкам."""
+    """Зашифровать данные согласно настройкам (по умолчанию — контейнер v2)."""
     st.validate()
     warnings = _collect_warnings(st)
     if st.mode == 'siv':
-        res: SivResult = encrypt_siv(
+        res: SivResult = encrypt_siv2(
+            _spec(st), st.cipher, st.source, data,
+            st.effective_siv_options(), progress_cb=progress,
+            backend=st.backend, threads=st.threads)
+    else:
+        res = encrypt_ecb2(
             _spec(st), st.cipher, st.source, data,
             st.effective_siv_options(), progress_cb=progress,
             backend=st.backend)
-    else:
-        t0 = time.monotonic()
-        if progress:
-            progress('Вывод ключа…', None)
-        k_enc = mode_key(_spec(st), st.cipher, st.source, _ZERO_SALT,
-                         st.kdf_params, b'/ECB-RAWKEY/')
-        km = None
-        if progress:
-            progress('Расписание ключей шифра…', None)
-        from .cipher.schedule import key_schedule
-        km = key_schedule(_spec(st), k_enc)
-        res: EcbResult = encrypt_ecb(_spec(st), st.cipher, k_enc, data,
-                                     km=km, backend=st.backend,
-                                     progress_cb=progress)
-        res.meta['kdf_ms'] = (time.monotonic() - t0) * 1000.0
     return Result(res.data, st.cipher, st.mode, res.fields, res.meta,
                   warnings)
 
@@ -172,25 +166,37 @@ def encrypt(st: Settings, data: bytes,
 def decrypt(st: Settings, data: bytes,
             progress: Optional[Callable[[str, Optional[float]], None]] = None,
             ) -> Result:
-    """Расшифровать данные; для SIV — с проверкой подлинности (V)."""
+    """Расшифровать данные.
+
+    Контейнер распознаётся автоматически: шифр, режим, KDF-параметры и
+    состав полей берутся ИЗ файла (настройки панели игнорируются — кроме
+    пароля/ключа).
+    """
     st.validate()
-    warnings = _collect_warnings(st)
-    if st.mode == 'siv':
-        res: SivResult = decrypt_siv(
-            _spec(st), st.cipher, st.source, data,
-            st.effective_siv_options(), progress_cb=progress,
-            backend=st.backend)
+    if not ct.is_container(data):
+        raise PacketFormatError(
+            'данные не распознаны как контейнер Kazual v2: файл повреждён, '
+            'обрезан или создан другой программой')
+    return _decrypt_v2(st, data, progress)
+
+
+def _decrypt_v2(st: Settings, data: bytes, progress) -> Result:
+    info = ct.parse_header(data, file_size=len(data))
+    cipher_name = info.cipher_name
+    mode = 'siv' if info.mode == ct.MODE_SIV else 'ecb'
+    warnings = _collect_warnings(st, cipher=cipher_name, mode=mode)
+    opts = st.effective_siv_options()
+    if info.mode == ct.MODE_SIV:
+        res: SivResult = decrypt_siv2(st.source, data, opts,
+                                      progress_cb=progress,
+                                      backend=st.backend, threads=st.threads,
+                                      info=info)
     else:
-        if progress:
-            progress('Вывод ключа…', None)
-        k_enc = mode_key(_spec(st), st.cipher, st.source, _ZERO_SALT,
-                         st.kdf_params, b'/ECB-RAWKEY/')
-        if progress:
-            progress('Расписание ключей шифра…', None)
-        from .cipher.schedule import key_schedule
-        km = key_schedule(_spec(st), k_enc)
-        res: EcbResult = decrypt_ecb(_spec(st), st.cipher, k_enc, data,
-                                     km=km, backend=st.backend,
-                                     progress_cb=progress)
-    return Result(res.data, st.cipher, st.mode, res.fields, res.meta,
+        res = decrypt_ecb2(st.source, data, opts, progress_cb=progress,
+                           backend=st.backend, info=info)
+    res.meta['detected'] = info.describe()
+    if info.kdf_params is None:
+        res.meta['params_note'] = ('в файле нет параметров KDF — '
+                                   'использованы параметры из настроек')
+    return Result(res.data, cipher_name, mode, res.fields, res.meta,
                   warnings)
