@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Виртуальные окружения
+.venv/
+venv/
+env/
+
+# Тесты и линтеры
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / ОС
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Локальные артефакты
+*.kaz
+*.b64
+*.hex
+scratch/

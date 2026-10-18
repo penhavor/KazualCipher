@@ -1,0 +1,35 @@
+MIT License
+
+Copyright (c) 2026 KazualCipher contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+ПРИМЕЧАНИЕ О КРИПТОСТОЙКОСТИ / CRYPTOGRAPHIC DISCLAIMER
+
+Шифры семейства Kazual и режимы этой программы — экспериментальная учебная
+конструкция. Она НЕ проходила независимого криптоанализа, не имеет
+формального доказательства стойкости и НЕ предназначена для защиты реальных
+данных. Используя программу, вы принимаете это ограничение.
+
+The Kazual cipher family and the modes implemented here are an experimental,
+educational construction. They have NOT undergone independent cryptanalysis,
+carry no formal security proof, and are NOT intended for protecting real
+data. By using this software you accept this limitation.

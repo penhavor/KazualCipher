@@ -1,0 +1,1803 @@
+
+
+
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kazual-512 — спецификация блочного шифра</title>
+<style>
+:root{--bg:#0b0e14;--card:#151b26;--line:#253044;--tx:#e6edf3;--mut:#8b98ab;--dim:#5f6b7d;
+ --acc:#4ea1ff;--ok:#7ee787;--warn:#ffb454;--bad:#ff6b6b;--pur:#c792ea;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#0b0e14,#0d121b 40%,#0b0e14);color:var(--tx);
+ font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px 90px}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.15;margin:0 0 12px;letter-spacing:-.02em;font-weight:800}
+h1 .g{background:linear-gradient(90deg,#4ea1ff,#c792ea 55%,#7ee787);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:clamp(21px,2.9vw,29px);margin:54px 0 6px;font-weight:750;letter-spacing:-.01em}
+h2 .num{color:var(--acc);font-family:var(--mono);font-size:.7em;margin-right:10px}
+h3{font-size:19px;margin:28px 0 8px;font-weight:700}
+h4{font-size:13.5px;margin:20px 0 6px;color:var(--ok);text-transform:uppercase;letter-spacing:.08em}
+p{margin:10px 0}.lead{color:#c8d3e0}
+a{color:var(--acc);text-decoration:none;border-bottom:1px dotted rgba(78,161,255,.45)}
+code,.mono{font-family:var(--mono);font-size:.92em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:18px 0}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;background:#101622}
+td.n,th.n{text-align:right;font-family:var(--mono)}
+tr:hover td{background:rgba(78,161,255,.045)}
+.good{color:var(--ok)}.bad{color:var(--bad)}.mid{color:var(--warn)}
+.formula{background:#0a0f17;border:1px solid var(--line);border-left:3px solid var(--pur);border-radius:10px;
+ padding:14px 18px;margin:14px 0;font-family:var(--mono);font-size:14px;overflow-x:auto;color:#d8e3f0;white-space:pre}
+.formula .cm{color:var(--dim)}
+pre.code{background:#0a0f17;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;
+ font-family:var(--mono);font-size:13.5px;overflow-x:auto;color:#d8e3f0;line-height:1.5}
+pre.code .cm{color:#5f6b7d}pre.code .kw{color:#c792ea}pre.code .fn{color:#7ee787}pre.code .nu{color:#ffb454}
+.note{color:var(--mut);font-size:14px}.small{font-size:13.5px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-family:var(--mono);
+ border:1px solid var(--line);background:#0e1420;color:var(--mut);white-space:nowrap}
+.pill.a{border-color:#2b5f9e;color:#8fc4ff;background:#0f1c2e}
+.pill.b{border-color:#2f6b3f;color:#95e6a5;background:#0f1f15}
+.pill.c{border-color:#7a5a24;color:#ffcf85;background:#1f1810}
+.pill.d{border-color:#6b3f6b;color:#e6b3ff;background:#1c1220}
+.warn{background:#231a10;border:1px solid #7a5a24;border-left:3px solid var(--warn);border-radius:10px;padding:12px 16px;margin:14px 0}
+.danger{background:#241416;border:1px solid #7a2d2d;border-left:3px solid var(--bad);border-radius:10px;padding:12px 16px;margin:14px 0}
+.ok{background:#101f15;border:1px solid #2f6b3f;border-left:3px solid var(--ok);border-radius:10px;padding:12px 16px;margin:14px 0}
+.diagram{background:#0a0f17;border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0}
+.diagram .cap{color:var(--mut);font-size:13px;margin-top:8px;text-align:center}
+svg{display:block;max-width:100%}
+table.sbox{font-family:var(--mono);font-size:11.5px;margin:8px 0 18px}
+table.sbox th,table.sbox td{padding:3px 5px;text-align:center;border-bottom:1px solid #1a2231}
+table.sbox th{background:#0e1420;font-size:10.5px;color:var(--dim)}
+table.sbox td{color:#9fb0c6}
+table.tr{font-size:13.5px}table.tr td.mono{font-family:var(--mono);font-size:13px;color:#cfe0f5}
+table.tr tr.hl td{background:rgba(78,161,255,.07)}
+table.tr td.diff{color:#ff8f8f;font-weight:700}
+.wrapx{word-break:break-all;max-width:420px}
+ul.clean{padding-left:20px}ul.clean li{margin:7px 0}
+ol.small li{margin:6px 0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:14.5px}
+.kv dt{color:var(--mut);font-family:var(--mono);font-size:13px;white-space:nowrap}
+.kv dd{margin:0}
+.hl{background:rgba(255,180,84,.13);border-radius:4px;padding:0 4px}
+.hl2{background:rgba(126,231,135,.12);border-radius:4px;padding:0 4px}
+footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);color:var(--dim);font-size:13.5px}
+.toc{columns:2;column-gap:26px;font-size:14px}
+.toc a{display:block;padding:3px 0;border:0;color:#b9c7d8}
+@media(max-width:700px){.toc{columns:1}}
+</style>
+</head><body><div class="wrap">
+
+<header style="padding:52px 0 22px;border-bottom:1px solid var(--line);margin-bottom:30px">
+<h1>Kazual-<span class="g">512</span></h1>
+<p class="lead" style="max-width:880px">Полная спецификация блочного шифра: блок <b>512 бит</b>,
+ключ <b>512 бит</b>, <b>5 тяжёлых раундов</b>. Каркас — схема Лай–Мэсси; раундовая функция F —
+необратимый SPN с <b>ключезависимыми таблицами</b> и ARX-предтактом; пол-раунд H — связка
+«ортоморфизм в GF(2¹⁶) → несущая ARX → полный веер MDS 64×64»; расписание ключей —
+двутактная обобщённая сеть Фейстеля Type-2 с <b>самоизменяющимися таблицами</b>.
+Внешних криптографических примитивов нет: собственная сжимающая функция <b>ГОРН-1024</b>
+собрана из тех же кирпичей, что и шифр. Семью дополняет <b>Kazual-64</b> (§13) — учебная версия
+того же алгоритма в размерах, пригодных для счёта вручную и даже на бумаге; для защиты данных
+предназначен только Kazual-512.</p>
+<p class="note">Все заявленные свойства вычислены запуском кода. Эталонная
+однофайловая реализация <code>kazual-512.py</code> воспроизводит алгоритм побитово:
+тестовые векторы (§14), трассу Kazual-64 вплоть до внутренних стадий (§13) и ключевой
+подмножество проверок — режим <code>--selftest</code> (~15 с). Расширенные измерения
+(750 трейлов, полные переборы) выполнены исходным пакетом <code>kazual/results.py</code>
+и зафиксированы в <code>kazual/results.json</code>, из которого собран этот документ.</p>
+</header>
+
+<div class="danger">
+<b>Дисклеймер.</b> Это экспериментальная учебная конструкция, собранная, чтобы показать, как
+сочетаются каркас Лай–Мэсси, SPN, APN-подстановки, динамические Cauchy-MDS, смешанная
+алгебра (GF(2⁸) / GF(2¹⁶) / Z₂⁶⁴) и GFN-расписание ключей. Она <b>не проходила</b> независимого
+криптоанализа, не имеет формального доказательства стойкости и <b>не предназначена для защиты
+реальных данных</b>. Ниже — инженерный проект с явными обоснованиями, разделением
+«доказано / измерено / предположено» и честно перечисленными пробелами (§15).
+</div>
+
+<div class="card"><h4 style="margin-top:0">Содержание</h4><div class="toc">
+<a href="#s0">§0 Паспорт шифра</a>
+<a href="#s1">§1 Философия: тяжёлый раунд и «полезная странность»</a>
+<a href="#s2">§2 Архитектура в одном рисунке</a>
+<a href="#s3">§3 Три алгебры и статическое ядро</a>
+<a href="#s4">§4 ГОРН-1024: собственная сжимающая функция</a>
+<a href="#s5">§5 КУЗНИЦА: динамические таблицы</a>
+<a href="#s6">§6 Каркас Лай–Мэсси и пять закрытых дыр</a>
+<a href="#s7">§7 F: трёхтактный необратимый SPN</a>
+<a href="#s8">§8 H: пол-раунд «ортоморфизм → несущая → веер»</a>
+<a href="#s9">§9 Расписание ключей: двутактная GFN Type-2</a>
+<a href="#s10">§10 Алгоритм целиком</a>
+<a href="#s11">§11 Анализ стойкости</a>
+<a href="#s12">§12 Скорость и параллелизм</a>
+<a href="#s13">§13 Kazual-64: учебная версия и ручной пример</a>
+<a href="#s14">§14 Тестовые векторы</a>
+<a href="#s15">§15 Что осталось недоказанным</a>
+<a href="#s16">§16 Файлы проекта и источники</a>
+</div></div>
+<h2 id="s0"><span class="num">§0</span>Паспорт шифра</h2>
+<div class="card"><dl class="kv">
+<dt>название</dt><dd><b>Kazual-512</b> — рабочий шифр (только для компьютера); <b>Kazual-64</b> (§13) — учебная версия того же алгоритма для ручного счёта, качественно идентична и отличается лишь размерами, НЕ для защиты данных; Kazual-Micro — измерительный инструмент</dd>
+<dt>блок</dt><dd><b>512 бит</b> = L (256) ‖ R (256) = 64 байта</dd>
+<dt>ключ</dt><dd><b>512 бит</b> (единственная длина; укороченные ключи не поддерживаются сознательно)</dd>
+<dt>каркас</dt><dd>схема <b>Лай–Мэсси</b> с ключевым пол-раундом H (§6, §8)</dd>
+<dt>раундов</dt><dd><b>5</b> вызовов F + <b>6</b> пол-раундов H («5.5» в терминологии IDEA)</dd>
+<dt>F</dt><dd>необратимый <b>SPN</b>: Предтакт (Заслонка + Несущая) → 3 такта «аффинная маска → 32 S-box’а → динамическая MDS 32×32» → эпилог, 256→256 бит (§7)</dd>
+<dt>H</dt><dd><b>Ортоморфизм</b> (32 чанка GF(2¹⁶)) → <b>Несущая</b> (ARX, 8 слов × 64 бита) → <b>Веер</b> (динамическая MDS 64×64), 512→512 бит, биекция (§8)</dd>
+<dt>статическое ядро</dt><dd>три S-box’а 8×8: Gold x³ (APN, δ=2), Kasami x⁵⁷ (APN, δ=2), inverse x²⁵⁴ (δ=4); Cauchy-MDS; все свойства проверены перебором (§3.2)</dd>
+<dt>динамические таблицы</dt><dd>генерируются <b>КУЗНИЦЕЙ</b> из раундового сида: аффинные маски, назначение S-box’ов, перестановки Коши π/ρ, параметры Заслонки и Несущей — <b>6928 байт на ключ</b> (§5)</dd>
+<dt>линейный слой</dt><dd>динамическая Cauchy-MDS: n×n над GF(2⁸), ветвевое число <b>n+1 при любом ключе</b> (доказуемо), n = 32 в F и 64 в H (§3.3)</dd>
+<dt>смешанная алгебра</dt><dd>GF(2⁸) · GF(2¹⁶) · Z₂⁶⁴ (сложение и умножение по модулю 2⁶⁴) — три несовместимые алгебраические структуры в одном раунде</dd>
+<dt>сжимающая функция</dt><dd><b>ГОРН-1024</b> — собственная: тигель 16 лейн × 64 бита, 8 раундов «Σ Μ Ρ Α», 128-дорожечный параллелизм (§4)</dd>
+<dt>расписание ключей</dt><dd>ГОРН → <b>двутактная GFN Type-2</b> (k=8 ветвей × 64 бита, 32 раунда, самоизменяющиеся таблицы, полная MDS 64×64, ветвевое число 65) → нарезка (§9)</dd>
+<dt>поля</dt><dd>GF(2⁸): x⁸+x⁴+x³+x+1 = 0x11B, образующий <b>3</b> (порядок 2 — 51, не первообразен); GF(2¹⁶): x¹⁶+x¹²+x³+x+1 = 0x1100B, образующий 2 (§3.1)</dd>
+<dt>константы</dt><dd>выводятся из пула «ничего-в-рукаве» — 2048 бит шестнадцатеричных цифр дробных частей <b>π</b> и <b>e</b> — и из ГОРНа (§3.4)</dd>
+<dt>шифр ≠ дешифр по стоимости</dt><dd>одна и та же F; обратный порядок подключей; H⁻¹ требует обратного Веера, который <b>бесплатен</b>: M⁻¹ = P<sub>ρ</sub>⁻¹·C⁻¹·P<sub>π</sub>⁻¹ (§3.3)</dd>
+<dt>стоимость блока</dt><dd>≈ <b>42864</b> элементарных операций (670 оп/байт); ≈0.6 мс/блок в оптимизированной эталонной реализации на Python, пакетные режимы NumPy/CuPy (§12)</dd>
+<dt>уровень стойкости</dt><dd><b>2²⁵⁶</b> — неотличимость от случайной перестановки (birthday bound блока); <b>2⁵¹²</b> — восстановление ключа перебором (энтропия ключа сохранена расписанием, §9.4). Заявляемый уровень = min = <b>256 бит</b> при лимите данных на ключ ~2²⁵⁶ блоков (§11)</dd>
+</dl></div>
+<h2 id="s1"><span class="num">§1</span>Философия: тяжёлый раунд и «полезная странность»</h2>
+<p class="lead">Ограничение задано так: раундов мало, зато каждый максимально тяжёлый, и всё это
+не должно ломать параллелизм. Отсюда два правила, которым подчинён весь проект.</p>
+<div class="grid g2">
+<div class="card" style="margin:0"><h4 style="margin-top:0">Правило 1. Сложность должна конвертироваться в биты</h4>
+<p class="small" style="margin:0">Каждое усложнение обязано пересчитываться в измеримую величину:
+дифференциальную равномерность δ, нелинейность NL, ветвевое число, число активных S-box’ов,
+алгебраическую степень, энтропию ключа, ширину SIMD-дорожки. Если выгода не измеряется —
+решение не принимается.</p></div>
+<div class="card" style="margin:0"><h4 style="margin-top:0">Правило 2. «Полезная странность» вместо странности вообще</h4>
+<p class="small" style="margin:0">Экзотика допускается только та, которая ломает чьё-то удобное
+для атаки предположение: что таблицы одинаковы для всех ключей, что линейный слой фиксирован,
+что в раунде одна алгебра, что хеш — это чёрный ящик из учебника. Плата за это — сложность
+понимания; она в списке приоритетов последняя.</p></div>
+</div>
+<table><thead><tr><th>решение</th><th>что даёт (доказано или измерено)</th><th>цена</th><th>вердикт</th></tr></thead><tbody>
+<tr><td><b>Каркас Лай–Мэсси</b> вместо Фейстеля</td><td>обе половины блока меняются <b>каждый раунд</b>: в примере Kazual-64 (§13) различие в 1 бит даёт 37 бит различия из 64 уже после H₀, тогда как Фейстель один раунд держит половину нетронутой</td><td>нужен обратимый пол-раунд H</td><td class="good">оправдано</td></tr>
+<tr><td><b>F необратима</b> (APN S-box’ы)</td><td>δ = 2 вместо 4 → выигрыш 1 бит на активный S-box; при измеренных ≥93 активных это разница в 2<sup>93</sup> раз по дифференциальной вероятности. Образ F ⊆ 2<sup>221.4</sup> из 2²⁵⁶</td><td>F теряет ≥ 34.6 бит входа; обратного хода нет (он и не нужен)</td><td class="good">оправдано</td></tr>
+<tr><td><b>Динамическая Cauchy-MDS</b> (π, ρ из ключа)</td><td>M = P<sub>π</sub>·C·P<sub>ρ</sub> — любая квадратная подматрица по-прежнему невырождена, значит <b>ветвевое число n+1 при ЛЮБОМ ключе</b> (доказано определителем Коши, проверено на 9 наборах). Атакующий не может предвычислить ни одной линейной оболочки</td><td>две перестановки на слой (≈960 Б на ключ)</td><td class="good">оправдано</td></tr>
+<tr><td><b>Обратная MDS бесплатна</b></td><td>M⁻¹[j][i] = C⁻¹[ρ(j)][π(i)]: обратная матрица есть <b>фиксированная</b> C⁻¹ с переставленными ИНДЕКСАМИ. Ни обращения матриц, ни лишней памяти на ключ</td><td>0</td><td class="good">оправдано (PRINCE-приём, перенесённый в расписание)</td></tr>
+<tr><td><b>Множество значений MDS фиксировано</b></td><td>в динамической MDS n×n встречается ровно n различных констант inv(n+t), t &lt; n — и они <b>не зависят от ключа</b> (проверено для n = 8/32/64). От ключа зависит только расположение. Значит n таблиц умножения (24 КБ) — общие на все ключи: кэш, bitslice и аппаратура не страдают</td><td>0</td><td class="good">оправдано</td></tr>
+<tr><td><b>КУЗНИЦА: таблицы из раундового ключа</b></td><td>аффинные маски сохраняют δ и NL <b>точно</b> (аффинная эквивалентность); перестановка назначений φ не меняет числа активных S-box’ов; π/ρ не меняют ветвевое число. То есть вся динамика — <b>бесплатная</b> стойкость поверх статического ядра</td><td>6928 Б на ключ логически (223 КБ в табличной реализации)</td><td class="good">оправдано</td></tr>
+<tr><td><b>Несущая (ARX mod 2⁶⁴)</b> внутри H и в Предтакте F</td><td>вторая и третья алгебры: переносы дают алгебраическую степень <b>15 из 16</b> на модельной инстанции против 8 у чистого сложения и 9 у чистого умножения; измерено: 1 бит входа расходится на 8 слов из 8 и ~260 бит из 512 за 4 фазы</td><td>последовательная цепочка внутри фазы</td><td class="good">оправдано: пары в фазе независимы → 4-дорожечный SIMD</td></tr>
+<tr><td><b>Веер: полная MDS 64×64 в пол-раунде</b></td><td>ветвевое число <b>65</b>: 1 активный байт на входе H → 64 на выходе. Плюс Δ′ = u⊕v есть проекция нижней половины Веера, у которой нет нулей: <b>вес Δz = 1 ⇒ вес Δ′ = 32 (полный)</b> — проверено для всех 64 позиций</td><td>4096 умножений в GF(2⁸) на пол-раунд</td><td class="good">оправдано (это и есть «тяжёлый раунд»)</td></tr>
+<tr><td><b>Заслонка (FL-подобный подслой)</b></td><td>ключевые AND/OR дают степень по битам КЛЮЧА и ломают линейность забеливания; треугольна → биективна (проверено на 200 прогонах)</td><td>8 независимых 32-битных слов, ~64 оп на вызов F</td><td class="good">оправдано</td></tr>
+<tr><td><b>ГОРН-1024 как собственная сжимающая функция</b></td><td>ни одной внешней зависимости; внутренняя перестановка <b>биективна</b> (проверено явным обратным ходом), ранг свёртки ровно 512, SAC 256.2 из 512, коллизий 0 на 3000 входов. Глубина — 8 раундов по 4 коротких стадии при ширине 128 байт, то есть схема на порядки шире и мельче, чем последовательная 80-шаговая цепочка</td><td>собственный код и собственный анализ</td><td class="good">оправдано</td></tr>
+<tr><td><b>Двутактная GFN с самоизменяющимися таблицами</b></td><td>таблицы раунда берутся из ведущего регистра, а преобразуется ведомый → отображение <b>доказуемо биективно</b> (X = Y₁⊕X₁ восстанавливается первым), поэтому энтропия ключа не теряется, но ни один раунд не повторяет другой</td><td>~140288 операций на ключ</td><td class="good">оправдано (один раз на ключ)</td></tr>
+<tr><td><b>Ровно равномерная генерация</b> (Кузница)</td><td>код Лемера для перестановок (смещение ≤ 2⁻⁹⁶), отбраковка для единиц поля (ожид. 1.004 чтения), x|1 для нечётных множителей. <b>Смещения распределения ключевого материала нет вовсе</b></td><td>несколько лишних байт материала</td><td class="good">оправдано</td></tr>
+<tr><td>Умножение в GF(2²⁵⁶)</td><td>диффузия была бы «красивее», но Веер уже даёт ветвевое число 65 — предел для 64-байтового состояния</td><td>очень дорого</td><td class="bad">отклонено: сложность без выгоды</td></tr>
+<tr><td>S-box’ы 16×16</td><td>δ = 2 для 16-битных биекций неизвестно; таблицы 512 КБ; кэш-атаки</td><td>огромная память</td><td class="bad">отклонено</td></tr>
+<tr><td>Динамические таблицы <i>вместо</i> статических</td><td>нечего гарантировать: если таблицы целиком из ключа, любое ослабление генератора обрушивает всю стойкость</td><td>—</td><td class="bad">отклонено: статическое ядро оставлено фундаментом, динамика надстроена поверх</td></tr>
+<tr><td>Последовательный ARX-микшер через все 8 слов</td><td>диффузия та же</td><td>убивает внутриблочный SIMD</td><td class="bad">отклонено: спаривание по 4 независимые пары</td></tr>
+</tbody></table>
+<div class="ok"><b>Принцип, который соблюдался.</b> Статическое ядро (S-box’ы, Cauchy-MDS,
+константы π/e) — это гарант: его свойства перебраны и не зависят от ключа. Всё динамическое
+спроектировано так, что <b>не может ухудшить</b> ни одного параметра ядра: аффинная маска сохраняет
+δ и NL, перестановка φ сохраняет счёт активных S-box’ов, перестановки π/ρ сохраняют ветвевое число.
+Динамика добавляет «непредвычислимость», ничего не отнимая.</div>
+<h2 id="s2"><span class="num">§2</span>Архитектура в одном рисунке</h2>
+<div class="diagram">
+<svg viewBox="0 0 900 500" width="100%" role="img" aria-label="Каркас Kazual-512">
+<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8b98ab"/></marker></defs>
+<g font-family="ui-monospace,monospace" font-size="13">
+<text x="230" y="22" fill="#8b98ab" text-anchor="middle">P = L₀ ‖ R₀  (512 бит)</text>
+<line x1="230" y1="30" x2="230" y2="46" stroke="#8b98ab" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="110" y="48" width="240" height="26" rx="6" fill="#101a2a" stroke="#4ea1ff"/>
+<text x="230" y="66" fill="#8fc4ff" text-anchor="middle">забеливание: ⊕ W_L , ⊕ W_R</text>
+<line x1="230" y1="74" x2="230" y2="90" stroke="#8b98ab" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="110" y="92" width="240" height="28" rx="6" fill="#1c1220" stroke="#c792ea"/>
+<text x="230" y="111" fill="#e6b3ff" text-anchor="middle">H₀  (пол-раунд, §8)</text>
+<line x1="175" y1="120" x2="175" y2="350" stroke="#4ea1ff" stroke-width="2"/>
+<line x1="285" y1="120" x2="285" y2="350" stroke="#7ee787" stroke-width="2"/>
+<text x="140" y="142" fill="#8fc4ff" font-size="12">L (256)</text>
+<text x="297" y="142" fill="#95e6a5" font-size="12">R (256)</text>
+<circle cx="230" cy="164" r="13" fill="#0d131d" stroke="#ffb454" stroke-width="2"/>
+<path d="M223,157 L237,171 M237,157 L223,171" stroke="#ffb454" stroke-width="2"/>
+<path d="M175,164 L217,164 M285,164 L243,164" stroke="#8b98ab" stroke-width="1.5"/>
+<circle cx="175" cy="164" r="3.5" fill="#4ea1ff"/><circle cx="285" cy="164" r="3.5" fill="#7ee787"/>
+<text x="320" y="150" fill="#ffcf85" font-size="12">Δ = L ⊕ R</text>
+<rect x="446" y="128" width="438" height="86" rx="10" fill="#0f1420" stroke="#ff6b6b" stroke-width="1.5"/>
+<text x="665" y="148" fill="#ff8f8f" text-anchor="middle" font-size="13" font-weight="bold">F — необратимый SPN (§7)</text>
+<text x="665" y="170" fill="#9fb0c6" text-anchor="middle" font-size="11">Предтакт: Заслонка (8×32) → Несущая (4×64 ARX)</text>
+<text x="665" y="188" fill="#9fb0c6" text-anchor="middle" font-size="11">3 × Такт: маска ⊗x⊕b → 32 S-box’а (φ из ключа) → MDS₃₂(π,ρ)</text>
+<text x="665" y="205" fill="#5f6b7d" text-anchor="middle" font-size="9.5">δ=2 · BN=33 при любом ключе · активных S-box’ов: ≥34 доказуемо, ≥93 измерено</text>
+<path d="M300,164 L446,164" stroke="#ffb454" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M665,214 L665,250 L420,250" stroke="#ff6b6b" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+<text x="520" y="244" fill="#ff8f8f" font-size="12">T = F(Δ, seed_i)</text>
+<circle cx="175" cy="250" r="13" fill="#0d131d" stroke="#c792ea" stroke-width="2"/>
+<path d="M168,243 L182,257 M182,243 L168,257" stroke="#c792ea" stroke-width="2"/>
+<circle cx="285" cy="250" r="13" fill="#0d131d" stroke="#c792ea" stroke-width="2"/>
+<path d="M278,243 L292,257 M292,243 L278,257" stroke="#c792ea" stroke-width="2"/>
+<path d="M420,250 L298,250" stroke="#ff6b6b" stroke-width="1.6"/>
+<path d="M272,250 L188,250" stroke="#ff6b6b" stroke-width="1.6" marker-end="url(#ar)"/>
+<text x="230" y="274" fill="#e6b3ff" text-anchor="middle" font-size="11.5">один T в ОБЕ половины — суть Лай–Мэсси</text>
+<rect x="110" y="350" width="240" height="28" rx="6" fill="#1c1220" stroke="#c792ea"/>
+<text x="230" y="369" fill="#e6b3ff" text-anchor="middle">H_i  (×5)</text>
+<text x="360" y="369" fill="#5f6b7d" font-size="11.5">↺ 5 раз</text>
+<rect x="446" y="286" width="438" height="80" rx="10" fill="#150f1c" stroke="#c792ea" stroke-width="1.5"/>
+<text x="665" y="306" fill="#e6b3ff" text-anchor="middle" font-size="13" font-weight="bold">H — пол-раунд, биекция (§8)</text>
+<text x="665" y="326" fill="#9fb0c6" text-anchor="middle" font-size="10.5">A: ортоморфизм, 32 чанка GF(2¹⁶) — det(A⊕id) = (a⊕1)(a′⊕1)⊕M₁M₂ ≠ 0</text>
+<text x="665" y="343" fill="#9fb0c6" text-anchor="middle" font-size="10.5">C: Несущая — 16 ARX-подшагов на 8 словах × 64 бита (×, +, rotl, ⊕)</text>
+<text x="665" y="360" fill="#9fb0c6" text-anchor="middle" font-size="10.5">B: Веер — MDS 64×64 (π,ρ), BN = 65; выход (p⊕q, p), Δ′ = q</text>
+<line x1="230" y1="378" x2="230" y2="398" stroke="#8b98ab" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="110" y="400" width="240" height="26" rx="6" fill="#101a2a" stroke="#4ea1ff"/>
+<text x="230" y="418" fill="#8fc4ff" text-anchor="middle">забеливание: ⊕ W′_L , ⊕ W′_R</text>
+<line x1="230" y1="426" x2="230" y2="446" stroke="#8b98ab" stroke-width="1.6" marker-end="url(#ar)"/>
+<text x="230" y="466" fill="#8b98ab" text-anchor="middle">C (512 бит)</text>
+<rect x="446" y="390" width="438" height="92" rx="10" fill="#0f1a14" stroke="#7ee787" stroke-width="1.5"/>
+<text x="665" y="410" fill="#95e6a5" text-anchor="middle" font-size="13" font-weight="bold">Расписание ключей (§9)</text>
+<text x="665" y="430" fill="#9fb0c6" text-anchor="middle" font-size="11.5">Z = ГОРН-1024(K) → двутактная GFN Type-2, 32 раунда,</text>
+<text x="665" y="447" fill="#9fb0c6" text-anchor="middle" font-size="10.5">8 ветвей × 64 бита, самоизменяющиеся таблицы, MDS 64×64 (BN 65)</text>
+<text x="665" y="464" fill="#9fb0c6" text-anchor="middle" font-size="11.5">→ 32768 бит материала → нарезка → КУЗНИЦА → динамические таблицы</text>
+<text x="665" y="478" fill="#5f6b7d" text-anchor="middle" font-size="10.5">биективна ⇒ энтропия ключа сохранена; ГОРН ⇒ прообраз ≈ 2⁵¹²</text>
+<path d="M665,390 L665,366" stroke="#7ee787" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+<path d="M665,286 L665,214" stroke="#7ee787" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+</g></svg>
+<div class="cap">Четыре уровня: каркас (Лай–Мэсси) → раундовая функция F и пол-раунд H → компоненты
+(Заслонка, Несущая, S-box, динамическая MDS) → расписание ключей с КУЗНИЦЕЙ</div>
+</div>
+<div class="card"><h4 style="margin-top:0">Функциональный состав (имена, которые встречаются дальше)</h4>
+<table class="tr"><thead><tr><th>функция</th><th>что делает</th><th>размер</th><th>обратима</th><th>параллельных дорожек</th></tr></thead><tbody>
+<tr><td class="mono">gorn_perm</td><td>внутренняя перестановка тигля: Σ Μ Ρ Α × 8</td><td class="mono">1024 → 1024 бит</td><td>да</td><td class="mono">128 / 8 / 16</td></tr>
+<tr><td class="mono">gorn_hash</td><td>губка: впитывание + свёртка</td><td class="mono">* → 512 бит</td><td>нет</td><td class="mono">по блокам</td></tr>
+<tr><td class="mono">gorn_expand</td><td>режим расширения сида (KDF)</td><td class="mono">* → N байт</td><td>нет</td><td class="mono">последовательно по 64 Б</td></tr>
+<tr><td class="mono">forge</td><td>КУЗНИЦА: сид → динамические таблицы</td><td class="mono">512 бит → 744 Б (F) / 402 Б (H)</td><td>нет</td><td class="mono">полностью</td></tr>
+<tr><td class="mono">shutter</td><td>Заслонка: FL/FL⁻¹ с ключевым поворотом</td><td class="mono">256 → 256 бит</td><td>да</td><td class="mono">8 слов</td></tr>
+<tr><td class="mono">carryweave</td><td>Несущая: ARX-микшер (×, +, rotl, ⊕)</td><td class="mono">W·wb → W·wb</td><td>да</td><td class="mono">W/2 пар</td></tr>
+<tr><td class="mono">stroke</td><td>Такт: маска → 32 S-box’а → динамическая MDS</td><td class="mono">256 → 256 бит</td><td>нет</td><td class="mono">32 / 32</td></tr>
+<tr><td class="mono">F</td><td>Предтакт → 3 × Такт → эпилог</td><td class="mono">256 → 256 бит</td><td><b>нет</b></td><td class="mono">32</td></tr>
+<tr><td class="mono">ortho_a</td><td>чанковый ортоморфизм с кросс-членами</td><td class="mono">512 → 512 бит</td><td>да</td><td class="mono">16 чанков</td></tr>
+<tr><td class="mono">fan_b</td><td>Веер: MDS 64×64, выход (p⊕q, p)</td><td class="mono">512 → 512 бит</td><td>да (бесплатно)</td><td class="mono">64 строки</td></tr>
+<tr><td class="mono">H / Hinv</td><td>пол-раунд: A → C → B</td><td class="mono">512 → 512 бит</td><td>да</td><td class="mono">64</td></tr>
+<tr><td class="mono">gfn2_round</td><td>раунд Type-2 с динамическими таблицами</td><td class="mono">512 → 512 бит</td><td>да</td><td class="mono">4 ветви / 64 строки</td></tr>
+<tr><td class="mono">duplex_ks</td><td>двутактное расписание: ведущий X, ведомый Y</td><td class="mono">512 → 32768 бит</td><td>да</td><td class="mono">по раундам — нет</td></tr>
+<tr><td class="mono">encrypt / decrypt</td><td>каркас Лай–Мэсси</td><td class="mono">512 → 512 бит</td><td>взаимно</td><td class="mono">по блокам</td></tr>
+<tr><td class="mono">encrypt_blocks / decrypt_blocks</td><td>пакетный режим эталонной реализации: та же схема, векторизованная по независимым блокам (NumPy / CuPy / процессы)</td><td class="mono">N×512 → N×512 бит</td><td>взаимно</td><td class="mono">все блоки сразу</td></tr>
+</tbody></table></div>
+<h2 id="s3"><span class="num">§3</span>Три алгебры и статическое ядро</h2>
+<p class="lead">Kazual-512 намеренно живёт сразу в трёх несовместимых алгебраических структурах.
+XOR-линейность GF(2ⁿ) даёт доказуемые ветвевые числа; переносы в Z₂⁶⁴ дают алгебраическую степень,
+недостижимую ни для какой XOR-схемы; GF(2¹⁶) даёт ортоморфизмы, нужные каркасу Лай–Мэсси.
+Алгебраическая атака, работающая в одной из них, разваливается о две другие.</p>
+<h3>3.1 Поля и кольцо</h3><div class="card">
+<table><thead><tr><th>структура</th><th>полином / модуль</th><th>образующий</th><th>где используется</th></tr></thead><tbody>
+<tr><td><b>GF(2⁸)</b></td><td class="mono">x⁸+x⁴+x³+x+1 = 0x11B</td><td class="mono">3 (порядок 255)</td>
+    <td>S-box’ы, аффинные маски, все Cauchy-MDS</td></tr>
+<tr><td><b>GF(2¹⁶)</b></td><td class="mono">x¹⁶+x¹²+x³+x+1 = 0x1100B</td><td class="mono">2 (порядок 65535)</td>
+    <td>стадия A пол-раунда: ортоморфизмы и кросс-члены</td></tr>
+<tr><td><b>Z₂⁶⁴</b></td><td class="mono">сложение и умножение по модулю 2⁶⁴</td><td class="mono">—</td>
+    <td>Несущая (ARX), Заслонка, стадии ГОРНа</td></tr>
+</tbody></table>
+<div class="warn"><b>Ловушка, в которую легко попасть.</b> Полином <code>0x11B</code> неприводим, но
+<b>не примитивен</b>: порядок элемента 2 в нём равен <b>51</b>, а не 255 (проверено перебором).
+Таблицы log/alog, построенные «умножением на 2», заполняют только подгруппу из 51 элемента и дают
+неверные произведения. Образующим взят элемент <b>3</b> (порядок 255 — проверяется при построении таблиц: исключение, если образующий не первообразен).</div>
+<p class="note">Умножение <code>a ⊗ b = alog[(log[a] + log[b]) mod (2ⁿ − 1)]</code>, при a = 0 или b = 0
+результат 0. Обратный элемент <code>a⁻¹ = alog[(2ⁿ − 1 − log[a]) mod (2ⁿ − 1)]</code>.
+Умножение по модулю 2⁶⁴ обратимо только для нечётных множителей — поэтому КУЗНИЦА выдаёт
+множители Несущей через <code>x | 1</code>.</p>
+</div>
+<h3>3.2 S-box’ы: три семейства, все свойства перебраны</h3>
+<p>Раундовая функция F необратима, поэтому <b>S-box’ы не обязаны быть перестановками</b>.
+Это главное конструктивное следствие каркаса Лай–Мэсси, и оно позволяет взять APN-функции —
+то, что запрещено в SPN с обратимым раундом.</p>
+<table><thead><tr><th>S-box</th><th>определение</th><th class="n">δ</th><th class="n">NL</th><th class="n">max|W|</th><th class="n">степень</th><th class="n">мономов<br>степени ≥2</th><th class="n">AND-гейтов<br>(с общими подтермами)</th><th class="n">биективен</th><th class="n">|образ|</th></tr></thead><tbody>
+<tr><td><b>S1</b></td><td class="mono">A₁(x³)&nbsp;&nbsp;Gold,&nbsp;&nbsp;APN</td><td class="n">2</td><td class="n">112</td><td class="n">32</td><td class="n">2</td><td class="n">114</td><td class="n good">28</td><td class="n">нет</td><td class="n">86/256</td></tr>
+<tr><td><b>S2</b></td><td class="mono">A₂(x⁵⁷)&nbsp;Kasami,&nbsp;APN</td><td class="n">2</td><td class="n">112</td><td class="n">32</td><td class="n">4</td><td class="n">634</td><td class="n good">154</td><td class="n">нет</td><td class="n">86/256</td></tr>
+<tr><td><b>S3</b></td><td class="mono">A₃(x²⁵⁴) inverse</td><td class="n">4</td><td class="n">112</td><td class="n">32</td><td class="n">7</td><td class="n">976</td><td class="n good">246</td><td class="n">да</td><td class="n">256/256</td></tr>
+</tbody></table>
+<p class="note">δ — дифференциальная равномерность (минимум для 8 бит равен 2),
+NL — нелинейность (максимум для 8 бит равен 120, у всех трёх здесь 112),
+max|W| — максимум модуля коэффициента Уолша–Адамара по всем 255 ненулевым b и всем a;
+отсюда линейная аппроксимация одного S-box’а имеет |корреляцию| ≤ 32/256 = <b>2⁻³</b>,
+степень — алгебраическая степень по всем 255 компонентным функциям,
+«мономов степени ≥2» — суммарное число нелинейных мономов ANF по всем восьми координатным
+функциям (верхняя оценка стоимости в bitslice до разделения общих подтермов);
+«AND-гейтов» — число <b>различных</b> мономов степени ≥ 2, то есть реальный размер bitslice-схемы
+при полном разделении общих подтермов. Все значения вычислены полным перебором
+(<code>kazual/sbox.py</code>), а не взяты из литературы.</p>
+<div class="grid g2"><div class="card" style="margin:0"><h4 style="margin-top:0">Что это даёт</h4><ul class="clean small">
+<li><b>δ = 2 вместо 4</b> → вероятность дифференциального перехода падает с 2⁻⁶ до 2⁻⁷ на каждый
+активный APN S-box. При измеренных ≥93 активных на вызов F разница с AES-подобной конструкцией
+составляет порядки.</li>
+<li><b>NL = 112 у всех трёх</b> → линейная стойкость не хуже, чем с биективными S-box’ами,
+то есть выигрыш в дифференциальной стойкости получен <i>бесплатно</i>.</li>
+<li><b>Степени 2 / 4 / 7</b>: чистая квадратичная x³ обнуляется на дифференциалах 3-го порядка,
+поэтому в каждом такте примерно треть позиций получает S₃ степени 7 — алгебраическая степень
+композиции насыщается за 2–3 такта (измерено на микро-инстанции: 4 → 14 из 16, §11.4).</li>
+<li><b>Небиективность — фича</b>: образ S₁ и S₂ — по 86 значений из 256, то есть каждая такая
+позиция безвозвратно теряет ≈1.57 бита. Отсюда необратимость F (§7.4).</li>
+<li><b>Разная bitslice-цена</b>: 28 / 154 / 246 AND-гейтов с общими подтермами. Квадратичная
+Gold-функция почти бесплатна: x³ = x ⊗ x², возведение в квадрат в GF(2⁸) линейно (чистые XOR),
+поэтому вся нелинейность укладывается в 28 попарных произведений x<sub>i</sub>·x<sub>j</sub> —
+ровно C(8,2) = 28. Две трети позиций каждого такта занимают именно такие подстановки.</li>
+</ul></div><div class="card" style="margin:0"><h4 style="margin-top:0">Точные определения</h4>
+<div class="formula">S₁(x) = m₁ ⊗ x³    ⊕ c₁     <span class="cm"># Gold,   APN, deg 2</span>
+S₂(x) = m₂ ⊗ x⁵⁷   ⊕ c₂     <span class="cm"># Kasami, APN, deg 4</span>
+S₃(x) = m₃ ⊗ x²⁵⁴  ⊕ c₃     <span class="cm"># inverse,     deg 7</span>
+
+сырой поток = ГОРН(msg = "", tag = "Kazual-512/SBOX-AFFINE/0")
+(m₁,c₁,m₂,c₂,m₃,c₃) = unit8(сырой₀), сырой₁, unit8(сырой₂), сырой₃, unit8(сырой₄), сырой₅
+                    = 9B 33 E2 3D ED C1
+<span class="cm"># unit8 = отбраковка нуля: нулевые байты потока пропускаются, пока не</span>
+<span class="cm"># встретится ненулевой — ровно равномерное распределение на GF(2⁸)* (§5.3).</span>
+<span class="cm"># Фактически сырые байты [0:6] = 9B 33 E2 3D ED C1 нулей не содержат,</span>
+<span class="cm"># поэтому позиции совпадают с формулой.</span></div>
+<p class="small" style="margin-bottom:0">Аффинное пост-преобразование <b>сохраняет</b> δ и NL
+(аффинная эквивалентность), но ломает мультипликативную симметрию <code>S(a⊗x) = a³⊗S(x)</code>,
+которую эксплуатируют «мультипликативные» дифференциальные атаки степенных функций.
+x²⁵⁴ при x = 0 даёт 0.</p>
+</div></div>
+<h4>Таблицы S-box’ов (256 значений каждый, hex)</h4>
+<p class="note">Строки — старший нибул, столбцы — младший. По этим таблицам шаги ручного примера из §13 проверяются без запуска кода.</p>
+<h4>S1 — A1(x^3)   Gold,   APN, deg 2</h4><table class="sbox"><thead><tr><th></th><th class="mono">_0</th><th class="mono">_1</th><th class="mono">_2</th><th class="mono">_3</th><th class="mono">_4</th><th class="mono">_5</th><th class="mono">_6</th><th class="mono">_7</th><th class="mono">_8</th><th class="mono">_9</th><th class="mono">_A</th><th class="mono">_B</th><th class="mono">_C</th><th class="mono">_D</th><th class="mono">_E</th><th class="mono">_F</th></tr></thead><tbody><tr><th class="mono">0_</th><td class="mono">33</td><td class="mono">A8</td><td class="mono">87</td><td class="mono">6B</td><td class="mono">E4</td><td class="mono">56</td><td class="mono">C5</td><td class="mono">00</td><td class="mono">D1</td><td class="mono">29</td><td class="mono">36</td><td class="mono">B9</td><td class="mono">C2</td><td class="mono">13</td><td class="mono">B0</td><td class="mono">16</td></tr><tr><th class="mono">1_</th><td class="mono">62</td><td class="mono">FB</td><td class="mono">E3</td><td class="mono">0D</td><td class="mono">1B</td><td class="mono">AB</td><td class="mono">0F</td><td class="mono">C8</td><td class="mono">FA</td><td class="mono">00</td><td class="mono">28</td><td class="mono">A5</td><td class="mono">47</td><td class="mono">94</td><td class="mono">00</td><td class="mono">A4</td></tr><tr><th class="mono">2_</th><td class="mono">8D</td><td class="mono">2F</td><td class="mono">29</td><td class="mono">FC</td><td class="mono">E9</td><td class="mono">62</td><td class="mono">D8</td><td class="mono">24</td><td class="mono">68</td><td class="mono">A9</td><td class="mono">9F</td><td class="mono">29</td><td class="mono">C8</td><td class="mono">20</td><td class="mono">AA</td><td class="mono">35</td></tr><tr><th class="mono">3_</th><td class="mono">21</td><td class="mono">81</td><td class="mono">B0</td><td class="mono">67</td><td class="mono">EB</td><td class="mono">62</td><td class="mono">EF</td><td class="mono">11</td><td class="mono">BE</td><td class="mono">7D</td><td class="mono">7C</td><td class="mono">C8</td><td class="mono">B0</td><td class="mono">5A</td><td class="mono">E7</td><td class="mono">7A</td></tr><tr><th class="mono">4_</th><td class="mono">B4</td><td class="mono">A9</td><td class="mono">D3</td><td class="mono">B9</td><td class="mono">E3</td><td class="mono">D7</td><td class="mono">11</td><td class="mono">52</td><td class="mono">B9</td><td class="mono">C7</td><td class="mono">8D</td><td class="mono">84</td><td class="mono">2A</td><td class="mono">7D</td><td class="mono">8B</td><td class="mono">AB</td></tr><tr><th class="mono">5_</th><td class="mono">DD</td><td class="mono">C2</td><td class="mono">8F</td><td class="mono">E7</td><td class="mono">24</td><td class="mono">12</td><td class="mono">E3</td><td class="mono">A2</td><td class="mono">AA</td><td class="mono">D6</td><td class="mono">AB</td><td class="mono">A0</td><td class="mono">97</td><td class="mono">C2</td><td class="mono">03</td><td class="mono">21</td></tr><tr><th class="mono">6_</th><td class="mono">A3</td><td class="mono">87</td><td class="mono">D4</td><td class="mono">87</td><td class="mono">47</td><td class="mono">4A</td><td class="mono">A5</td><td class="mono">DF</td><td class="mono">A9</td><td class="mono">EE</td><td class="mono">8D</td><td class="mono">BD</td><td class="mono">89</td><td class="mono">E7</td><td class="mono">38</td><td class="mono">21</td></tr><tr><th class="mono">7_</th><td class="mono">37</td><td class="mono">11</td><td class="mono">75</td><td class="mono">24</td><td class="mono">7D</td><td class="mono">72</td><td class="mono">AA</td><td class="mono">D2</td><td class="mono">47</td><td class="mono">02</td><td class="mono">56</td><td class="mono">64</td><td class="mono">C9</td><td class="mono">A5</td><td class="mono">4D</td><td class="mono">56</td></tr><tr><th class="mono">8_</th><td class="mono">67</td><td class="mono">16</td><td class="mono">8F</td><td class="mono">89</td><td class="mono">72</td><td class="mono">2A</td><td class="mono">0F</td><td class="mono">20</td><td class="mono">E9</td><td class="mono">FB</td><td class="mono">52</td><td class="mono">37</td><td class="mono">38</td><td class="mono">03</td><td class="mono">16</td><td class="mono">5A</td></tr><tr><th class="mono">9_</th><td class="mono">0F</td><td class="mono">7C</td><td class="mono">D2</td><td class="mono">D6</td><td class="mono">B4</td><td class="mono">EE</td><td class="mono">FC</td><td class="mono">D1</td><td class="mono">FB</td><td class="mono">EB</td><td class="mono">75</td><td class="mono">12</td><td class="mono">84</td><td class="mono">BD</td><td class="mono">9F</td><td class="mono">D1</td></tr><tr><th class="mono">A_</th><td class="mono">02</td><td class="mono">4A</td><td class="mono">FA</td><td class="mono">C5</td><td class="mono">A4</td><td class="mono">C5</td><td class="mono">C9</td><td class="mono">DF</td><td class="mono">8B</td><td class="mono">A0</td><td class="mono">20</td><td class="mono">7C</td><td class="mono">E9</td><td class="mono">EB</td><td class="mono">D7</td><td class="mono">A2</td></tr><tr><th class="mono">B_</th><td class="mono">97</td><td class="mono">DD</td><td class="mono">5A</td><td class="mono">67</td><td class="mono">9F</td><td class="mono">FC</td><td class="mono">C7</td><td class="mono">D3</td><td class="mono">64</td><td class="mono">4D</td><td class="mono">FA</td><td class="mono">A4</td><td class="mono">A8</td><td class="mono">A8</td><td class="mono">A3</td><td class="mono">D4</td></tr><tr><th class="mono">C_</th><td class="mono">DF</td><td class="mono">28</td><td class="mono">E4</td><td class="mono">64</td><td class="mono">4A</td><td class="mono">94</td><td class="mono">E4</td><td class="mono">4D</td><td class="mono">BE</td><td class="mono">2A</td><td class="mono">D6</td><td class="mono">35</td><td class="mono">EF</td><td class="mono">52</td><td class="mono">12</td><td class="mono">D8</td></tr><tr><th class="mono">D_</th><td class="mono">8F</td><td class="mono">7A</td><td class="mono">81</td><td class="mono">03</td><td class="mono">B4</td><td class="mono">68</td><td class="mono">2F</td><td class="mono">84</td><td class="mono">94</td><td class="mono">02</td><td class="mono">C9</td><td class="mono">28</td><td class="mono">6B</td><td class="mono">D4</td><td class="mono">A3</td><td class="mono">6B</td></tr><tr><th class="mono">E_</th><td class="mono">13</td><td class="mono">DD</td><td class="mono">38</td><td class="mono">81</td><td class="mono">35</td><td class="mono">D2</td><td class="mono">8B</td><td class="mono">1B</td><td class="mono">75</td><td class="mono">D8</td><td class="mono">0D</td><td class="mono">D7</td><td class="mono">97</td><td class="mono">13</td><td class="mono">7A</td><td class="mono">89</td></tr><tr><th class="mono">F_</th><td class="mono">BE</td><td class="mono">72</td><td class="mono">A0</td><td class="mono">1B</td><td class="mono">36</td><td class="mono">D3</td><td class="mono">BD</td><td class="mono">2F</td><td class="mono">A2</td><td class="mono">0D</td><td class="mono">EF</td><td class="mono">37</td><td class="mono">EE</td><td class="mono">68</td><td class="mono">36</td><td class="mono">C7</td></tr></tbody></table>
+<h4>S2 — A2(x^57)  Kasami, APN, deg 4</h4><table class="sbox"><thead><tr><th></th><th class="mono">_0</th><th class="mono">_1</th><th class="mono">_2</th><th class="mono">_3</th><th class="mono">_4</th><th class="mono">_5</th><th class="mono">_6</th><th class="mono">_7</th><th class="mono">_8</th><th class="mono">_9</th><th class="mono">_A</th><th class="mono">_B</th><th class="mono">_C</th><th class="mono">_D</th><th class="mono">_E</th><th class="mono">_F</th></tr></thead><tbody><tr><th class="mono">0_</th><td class="mono">3D</td><td class="mono">DF</td><td class="mono">83</td><td class="mono">A4</td><td class="mono">69</td><td class="mono">0E</td><td class="mono">6A</td><td class="mono">44</td><td class="mono">E1</td><td class="mono">2E</td><td class="mono">49</td><td class="mono">F2</td><td class="mono">21</td><td class="mono">C9</td><td class="mono">54</td><td class="mono">8F</td></tr><tr><th class="mono">1_</th><td class="mono">9A</td><td class="mono">D1</td><td class="mono">91</td><td class="mono">65</td><td class="mono">39</td><td class="mono">99</td><td class="mono">36</td><td class="mono">CB</td><td class="mono">7C</td><td class="mono">44</td><td class="mono">74</td><td class="mono">EA</td><td class="mono">38</td><td class="mono">AB</td><td class="mono">44</td><td class="mono">58</td></tr><tr><th class="mono">2_</th><td class="mono">73</td><td class="mono">2A</td><td class="mono">2E</td><td class="mono">27</td><td class="mono">85</td><td class="mono">9A</td><td class="mono">CC</td><td class="mono">DD</td><td class="mono">26</td><td class="mono">DA</td><td class="mono">B3</td><td class="mono">2E</td><td class="mono">CB</td><td class="mono">C6</td><td class="mono">F4</td><td class="mono">0D</td></tr><tr><th class="mono">3_</th><td class="mono">D6</td><td class="mono">E5</td><td class="mono">54</td><td class="mono">A6</td><td class="mono">E0</td><td class="mono">9A</td><td class="mono">6C</td><td class="mono">E7</td><td class="mono">66</td><td class="mono">72</td><td class="mono">87</td><td class="mono">CB</td><td class="mono">54</td><td class="mono">5C</td><td class="mono">15</td><td class="mono">BE</td></tr><tr><th class="mono">4_</th><td class="mono">3B</td><td class="mono">DA</td><td class="mono">8A</td><td class="mono">F2</td><td class="mono">91</td><td class="mono">DC</td><td class="mono">E7</td><td class="mono">43</td><td class="mono">F2</td><td class="mono">D9</td><td class="mono">73</td><td class="mono">24</td><td class="mono">2F</td><td class="mono">72</td><td class="mono">03</td><td class="mono">99</td></tr><tr><th class="mono">5_</th><td class="mono">A7</td><td class="mono">21</td><td class="mono">D8</td><td class="mono">15</td><td class="mono">DD</td><td class="mono">B7</td><td class="mono">91</td><td class="mono">AE</td><td class="mono">F4</td><td class="mono">AC</td><td class="mono">99</td><td class="mono">C7</td><td class="mono">AD</td><td class="mono">21</td><td class="mono">89</td><td class="mono">D6</td></tr><tr><th class="mono">6_</th><td class="mono">F5</td><td class="mono">83</td><td class="mono">81</td><td class="mono">83</td><td class="mono">38</td><td class="mono">E9</td><td class="mono">EA</td><td class="mono">ED</td><td class="mono">DA</td><td class="mono">1D</td><td class="mono">73</td><td class="mono">A5</td><td class="mono">BA</td><td class="mono">15</td><td class="mono">01</td><td class="mono">D6</td></tr><tr><th class="mono">7_</th><td class="mono">0C</td><td class="mono">E7</td><td class="mono">7B</td><td class="mono">DD</td><td class="mono">72</td><td class="mono">1F</td><td class="mono">F4</td><td class="mono">18</td><td class="mono">38</td><td class="mono">AA</td><td class="mono">0E</td><td class="mono">1C</td><td class="mono">D3</td><td class="mono">EA</td><td class="mono">B0</td><td class="mono">0E</td></tr><tr><th class="mono">8_</th><td class="mono">A6</td><td class="mono">8F</td><td class="mono">D8</td><td class="mono">BA</td><td class="mono">1F</td><td class="mono">2F</td><td class="mono">36</td><td class="mono">C6</td><td class="mono">85</td><td class="mono">D1</td><td class="mono">43</td><td class="mono">0C</td><td class="mono">01</td><td class="mono">89</td><td class="mono">8F</td><td class="mono">5C</td></tr><tr><th class="mono">9_</th><td class="mono">36</td><td class="mono">87</td><td class="mono">18</td><td class="mono">AC</td><td class="mono">3B</td><td class="mono">1D</td><td class="mono">27</td><td class="mono">E1</td><td class="mono">D1</td><td class="mono">E0</td><td class="mono">7B</td><td class="mono">B7</td><td class="mono">24</td><td class="mono">A5</td><td class="mono">B3</td><td class="mono">E1</td></tr><tr><th class="mono">A_</th><td class="mono">AA</td><td class="mono">E9</td><td class="mono">7C</td><td class="mono">6A</td><td class="mono">58</td><td class="mono">6A</td><td class="mono">D3</td><td class="mono">ED</td><td class="mono">03</td><td class="mono">C7</td><td class="mono">C6</td><td class="mono">87</td><td class="mono">85</td><td class="mono">E0</td><td class="mono">DC</td><td class="mono">AE</td></tr><tr><th class="mono">B_</th><td class="mono">AD</td><td class="mono">A7</td><td class="mono">5C</td><td class="mono">A6</td><td class="mono">B3</td><td class="mono">27</td><td class="mono">D9</td><td class="mono">8A</td><td class="mono">1C</td><td class="mono">B0</td><td class="mono">7C</td><td class="mono">58</td><td class="mono">DF</td><td class="mono">DF</td><td class="mono">F5</td><td class="mono">81</td></tr><tr><th class="mono">C_</th><td class="mono">ED</td><td class="mono">74</td><td class="mono">69</td><td class="mono">1C</td><td class="mono">E9</td><td class="mono">AB</td><td class="mono">69</td><td class="mono">B0</td><td class="mono">66</td><td class="mono">2F</td><td class="mono">AC</td><td class="mono">0D</td><td class="mono">6C</td><td class="mono">43</td><td class="mono">B7</td><td class="mono">CC</td></tr><tr><th class="mono">D_</th><td class="mono">D8</td><td class="mono">BE</td><td class="mono">E5</td><td class="mono">89</td><td class="mono">3B</td><td class="mono">26</td><td class="mono">2A</td><td class="mono">24</td><td class="mono">AB</td><td class="mono">AA</td><td class="mono">D3</td><td class="mono">74</td><td class="mono">A4</td><td class="mono">81</td><td class="mono">F5</td><td class="mono">A4</td></tr><tr><th class="mono">E_</th><td class="mono">C9</td><td class="mono">A7</td><td class="mono">01</td><td class="mono">E5</td><td class="mono">0D</td><td class="mono">18</td><td class="mono">03</td><td class="mono">39</td><td class="mono">7B</td><td class="mono">CC</td><td class="mono">65</td><td class="mono">DC</td><td class="mono">AD</td><td class="mono">C9</td><td class="mono">BE</td><td class="mono">BA</td></tr><tr><th class="mono">F_</th><td class="mono">66</td><td class="mono">1F</td><td class="mono">C7</td><td class="mono">39</td><td class="mono">49</td><td class="mono">8A</td><td class="mono">A5</td><td class="mono">2A</td><td class="mono">AE</td><td class="mono">65</td><td class="mono">6C</td><td class="mono">0C</td><td class="mono">1D</td><td class="mono">26</td><td class="mono">49</td><td class="mono">D9</td></tr></tbody></table>
+<h4>S3 — A3(x^254) inverse,     deg 7</h4><table class="sbox"><thead><tr><th></th><th class="mono">_0</th><th class="mono">_1</th><th class="mono">_2</th><th class="mono">_3</th><th class="mono">_4</th><th class="mono">_5</th><th class="mono">_6</th><th class="mono">_7</th><th class="mono">_8</th><th class="mono">_9</th><th class="mono">_A</th><th class="mono">_B</th><th class="mono">_C</th><th class="mono">_D</th><th class="mono">_E</th><th class="mono">_F</th></tr></thead><tbody><tr><th class="mono">0_</th><td class="mono">C1</td><td class="mono">2C</td><td class="mono">3A</td><td class="mono">9A</td><td class="mono">31</td><td class="mono">01</td><td class="mono">61</td><td class="mono">8B</td><td class="mono">B9</td><td class="mono">0E</td><td class="mono">A1</td><td class="mono">34</td><td class="mono">91</td><td class="mono">7D</td><td class="mono">E4</td><td class="mono">81</td></tr><tr><th class="mono">1_</th><td class="mono">FD</td><td class="mono">08</td><td class="mono">2B</td><td class="mono">97</td><td class="mono">F1</td><td class="mono">60</td><td class="mono">36</td><td class="mono">5C</td><td class="mono">E9</td><td class="mono">AB</td><td class="mono">9F</td><td class="mono">84</td><td class="mono">5E</td><td class="mono">92</td><td class="mono">E1</td><td class="mono">50</td></tr><tr><th class="mono">2_</th><td class="mono">DF</td><td class="mono">47</td><td class="mono">28</td><td class="mono">2F</td><td class="mono">B4</td><td class="mono">CF</td><td class="mono">EA</td><td class="mono">F0</td><td class="mono">D9</td><td class="mono">29</td><td class="mono">1C</td><td class="mono">E7</td><td class="mono">37</td><td class="mono">0B</td><td class="mono">02</td><td class="mono">F5</td></tr><tr><th class="mono">3_</th><td class="mono">D5</td><td class="mono">E6</td><td class="mono">F4</td><td class="mono">86</td><td class="mono">EE</td><td class="mono">F3</td><td class="mono">6E</td><td class="mono">53</td><td class="mono">03</td><td class="mono">43</td><td class="mono">65</td><td class="mono">AA</td><td class="mono">D1</td><td class="mono">94</td><td class="mono">04</td><td class="mono">57</td></tr><tr><th class="mono">4_</th><td class="mono">CE</td><td class="mono">B3</td><td class="mono">82</td><td class="mono">83</td><td class="mono">38</td><td class="mono">DA</td><td class="mono">B6</td><td class="mono">F2</td><td class="mono">76</td><td class="mono">AF</td><td class="mono">C6</td><td class="mono">BF</td><td class="mono">59</td><td class="mono">11</td><td class="mono">54</td><td class="mono">05</td></tr><tr><th class="mono">5_</th><td class="mono">CD</td><td class="mono">70</td><td class="mono">B5</td><td class="mono">DC</td><td class="mono">22</td><td class="mono">FC</td><td class="mono">D2</td><td class="mono">0D</td><td class="mono">BA</td><td class="mono">46</td><td class="mono">A4</td><td class="mono">C2</td><td class="mono">2D</td><td class="mono">20</td><td class="mono">DB</td><td class="mono">26</td></tr><tr><th class="mono">6_</th><td class="mono">CB</td><td class="mono">B1</td><td class="mono">5F</td><td class="mono">4A</td><td class="mono">56</td><td class="mono">9B</td><td class="mono">6F</td><td class="mono">BE</td><td class="mono">5B</td><td class="mono">27</td><td class="mono">D8</td><td class="mono">FA</td><td class="mono">1B</td><td class="mono">19</td><td class="mono">88</td><td class="mono">32</td></tr><tr><th class="mono">7_</th><td class="mono">A0</td><td class="mono">24</td><td class="mono">80</td><td class="mono">13</td><td class="mono">93</td><td class="mono">E5</td><td class="mono">79</td><td class="mono">87</td><td class="mono">C9</td><td class="mono">64</td><td class="mono">66</td><td class="mono">99</td><td class="mono">2E</td><td class="mono">2A</td><td class="mono">8A</td><td class="mono">A6</td></tr><tr><th class="mono">8_</th><td class="mono">4B</td><td class="mono">15</td><td class="mono">F8</td><td class="mono">67</td><td class="mono">6D</td><td class="mono">48</td><td class="mono">E0</td><td class="mono">98</td><td class="mono">30</td><td class="mono">44</td><td class="mono">41</td><td class="mono">A2</td><td class="mono">77</td><td class="mono">00</td><td class="mono">55</td><td class="mono">5A</td></tr><tr><th class="mono">9_</th><td class="mono">17</td><td class="mono">DE</td><td class="mono">F6</td><td class="mono">6B</td><td class="mono">4F</td><td class="mono">8F</td><td class="mono">FE</td><td class="mono">A5</td><td class="mono">8D</td><td class="mono">0A</td><td class="mono">A9</td><td class="mono">4E</td><td class="mono">06</td><td class="mono">D6</td><td class="mono">A3</td><td class="mono">DD</td></tr><tr><th class="mono">A_</th><td class="mono">C7</td><td class="mono">D4</td><td class="mono">14</td><td class="mono">18</td><td class="mono">FB</td><td class="mono">B8</td><td class="mono">42</td><td class="mono">BB</td><td class="mono">3D</td><td class="mono">1D</td><td class="mono">52</td><td class="mono">7A</td><td class="mono">45</td><td class="mono">25</td><td class="mono">A7</td><td class="mono">F7</td></tr><tr><th class="mono">B_</th><td class="mono">71</td><td class="mono">90</td><td class="mono">0F</td><td class="mono">0C</td><td class="mono">7E</td><td class="mono">10</td><td class="mono">4D</td><td class="mono">89</td><td class="mono">B7</td><td class="mono">16</td><td class="mono">3C</td><td class="mono">6A</td><td class="mono">CC</td><td class="mono">21</td><td class="mono">3F</td><td class="mono">75</td></tr><tr><th class="mono">C_</th><td class="mono">C4</td><td class="mono">4C</td><td class="mono">F9</td><td class="mono">EF</td><td class="mono">8E</td><td class="mono">FF</td><td class="mono">09</td><td class="mono">5D</td><td class="mono">07</td><td class="mono">D0</td><td class="mono">EC</td><td class="mono">58</td><td class="mono">96</td><td class="mono">72</td><td class="mono">73</td><td class="mono">C8</td></tr><tr><th class="mono">D_</th><td class="mono">8C</td><td class="mono">74</td><td class="mono">B2</td><td class="mono">1A</td><td class="mono">40</td><td class="mono">63</td><td class="mono">51</td><td class="mono">78</td><td class="mono">AC</td><td class="mono">62</td><td class="mono">AD</td><td class="mono">12</td><td class="mono">68</td><td class="mono">EB</td><td class="mono">35</td><td class="mono">33</td></tr><tr><th class="mono">E_</th><td class="mono">7C</td><td class="mono">9C</td><td class="mono">3E</td><td class="mono">95</td><td class="mono">6C</td><td class="mono">B0</td><td class="mono">A8</td><td class="mono">9E</td><td class="mono">E8</td><td class="mono">E3</td><td class="mono">D3</td><td class="mono">BC</td><td class="mono">9D</td><td class="mono">C0</td><td class="mono">E2</td><td class="mono">BD</td></tr><tr><th class="mono">F_</th><td class="mono">C5</td><td class="mono">49</td><td class="mono">1E</td><td class="mono">AE</td><td class="mono">1F</td><td class="mono">CA</td><td class="mono">ED</td><td class="mono">D7</td><td class="mono">3B</td><td class="mono">85</td><td class="mono">39</td><td class="mono">C3</td><td class="mono">69</td><td class="mono">7B</td><td class="mono">7F</td><td class="mono">23</td></tr></tbody></table>
+<h3>3.3 Cauchy-MDS и её динамическая форма</h3>
+<div class="card">
+<p>Базовая матрица Коши размера n над GF(2⁸):</p>
+<div class="formula">C[a][b] = ( a ⊕ (n + b) )⁻¹       a, b = 0 … n−1
+<span class="cm"># a пробегает [0, n), аргумент n + b пробегает [n, 2n):</span>
+<span class="cm"># старшие биты различаются, поэтому a ⊕ (n+b) ≠ 0 всегда</span></div>
+<p>Все <code>a</code> различны, все <code>n + b</code> различны, ни одна сумма не равна нулю — значит по
+формуле определителя Коши <b>любая</b> квадратная подматрица невырождена. Отсюда матрица MDS и
+ветвевое число <code>B(C) = n + 1</code>:</p>
+<div class="formula">B(M) = min<sub>x≠0</sub> ( wt(x) + wt(M·x) ) = n + 1
+   n = 8  (ветвь расписания)  → B = 9        n = 32 (такт F)   → B = 33
+   n = 16 (микшер ГОРНа)      → B = 17       n = 64 (Веер, GFN)→ B = 65</div>
+<table class="tr"><thead><tr><th>n</th><th>подматрицы</th><th class="n">ветвевое число</th><th class="n">различных значений</th><th>первая строка базовой матрицы</th></tr></thead><tbody>
+<tr><td class="mono">2</td><td>до 3×3 перебором + 200 случайных крупных</td><td class="n good">3 = n+1</td><td class="n">2</td><td class="mono wrapx small">8D F6…</td></tr>
+<tr><td class="mono">4</td><td>до 3×3 перебором + 200 случайных крупных</td><td class="n good">5 = n+1</td><td class="n">4</td><td class="mono wrapx small">CB 52 7B D1…</td></tr>
+<tr><td class="mono">8</td><td>до 3×3 перебором + 200 случайных крупных</td><td class="n good">9 = n+1</td><td class="n">8</td><td class="mono wrapx small">E8 4F 29 C0 B0 E1 E5 C7…</td></tr>
+<tr><td class="mono">16</td><td>до 2×2 перебором + 200 случайных крупных</td><td class="n good">17 = n+1</td><td class="n">16</td><td class="mono wrapx small">74 B4 AA 4B 99 2B 60 5F 58 3F FD CC FF 40 EE B2…</td></tr>
+<tr><td class="mono">32</td><td>до 2×2 перебором + 40 случайных крупных</td><td class="n good">33 = n+1</td><td class="n">32</td><td class="mono wrapx small">3A 6E 5A F1 55 4D A8 C9 C1 0A 98 15 30 44 A2 C2…</td></tr>
+<tr><td class="mono">64</td><td>до 2×2 перебором + 40 случайных крупных</td><td class="n good">65 = n+1</td><td class="n">64</td><td class="mono wrapx small">1D FE 37 67 2D 31 F5 69 A7 64 AB 13 54 25 E9 09…</td></tr>
+</tbody></table>
+<h4>Динамическая форма: M = P<sub>π</sub> · C · P<sub>ρ</sub></h4>
+<p>Ключ задаёт две перестановки <code>π</code> и <code>ρ</code> множества {0 … n−1}, и матрица
+раунда собирается как</p>
+<div class="formula">M[i][j] = ( π(i) ⊕ (n + ρ(j)) )⁻¹  =  C[ π(i) ][ ρ(j) ]</div>
+<p>Три следствия, каждое из которых проверено:</p>
+<ul class="clean">
+<li><b>Ветвевое число не зависит от ключа.</b> M — матрица Коши с координатами
+<code>x_i = π(i)</code> (все различны, из [0,n)) и <code>y_j = n + ρ(j)</code> (все различны, из [n,2n));
+<code>x_i ⊕ y_j ∈ [n, 2n)</code>, то есть никогда не ноль. Значит любая квадратная подматрица
+невырождена, M — MDS и <b>B(M) = n + 1 для любого ключа</b>. Это то, что позволяет иметь
+ключезависимый линейный слой, не теряя ни бита доказуемой стойкости.</li>
+<li><b>Обратная матрица бесплатна.</b> Из <code>M = P<sub>π</sub> C P<sub>ρ</sub></code> следует
+<div class="formula">M⁻¹ = P<sub>ρ</sub>⁻¹ · C⁻¹ · P<sub>π</sub>⁻¹,   то есть   M⁻¹[j][i] = C⁻¹[ ρ(j) ][ π(i) ]</div>
+C⁻¹ — <b>одна фиксированная матрица</b> размера n, зашитая в реализацию. Обратный ход требует
+только переставить индексы: ни обращения матриц на ключ, ни второй копии памяти. Именно поэтому
+Веер 64×64 в пол-раунде (§8) не стоит ничего при дешифровании.</li>
+<li><b>Множество значений фиксировано.</b> Возможные элементы — это
+<code>{ (n+t)⁻¹ : t = 0 … n−1 }</code>, ровно n штук, и они <b>не зависят ни от π, ни от ρ</b>
+(проверено: для n = 8 / 32 / 64 число различных значений равно 8 / 32 / 64 при любых перестановках).
+От ключа зависит только <i>расположение</i>. Практический смысл: нужно n таблиц умножения
+по 256 байт (8 КБ для n = 32 и 16 КБ для n = 64), общих на все ключи, — кэш-профиль,
+bitslice-реализация и площадь в аппаратуре не зависят от ключа.</li>
+</ul>
+<div class="ok"><b>Проверено на 9 случайных наборах (π, ρ)</b> для n = 8, 32, 64: все подматрицы до 2×2 невырождены, ветвевое число равно n+1, нулевых элементов нет, <code>M · M⁻¹ = I</code> при M⁻¹, собранной перестановкой индексов фиксированной C⁻¹. Ошибок 0.</div>
+<p class="note"><b>Побочный бонус.</b> Строка динамической MDS — это перестановка одного и того же
+набора из n констант, а столбец — перестановка того же набора. Поэтому слой «умножение на MDS»
+реализуется как n независимых XOR-сумм по n таблицам, без единого ветвления и без ключезависимых
+адресов памяти: ключ попадает только в таблицу индексов размером n² байт.</p>
+</div>
+<h3>3.4 Пул «ничего-в-рукаве»</h3>
+<div class="card">
+<p>Ни одна константа Kazual-512 не «выдумана». Внешних хеш-функций в проекте нет, поэтому
+источником служит арифметика: <b>2048 бит шестнадцатеричных цифр дробных частей π и e</b>.</p>
+<div class="formula">Π = π₁₆[0 … 255] ‖ e₁₆[0 … 255]     <span class="cm"># 32 слова по 64 бита</span>
+
+π₁₆ = 243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89
+        452821E638D01377BE5466CF34E90C6CC0AC29B7C97C50DD3F84D5B5B5470917
+        9216D5D98979FB1BD1310BA698DFB5AC2FFD72DBD01ADFB7B8E1AFED6A267E96
+        BA7C9045F12C7F9924A19947B3916CF70801F2E2858EFC16636920D871574E69
+e₁₆ = B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF
+        324E7738926CFBE5F4BF8D8D8C31D763DA06C80ABB1185EB4F7C7B5757F59584
+        90CFD47D7C19BB42158D9554F7B46BCED55C4D79FD5F24D6613C31C3839A2DDF
+        8A9A276BCFBFA1C877C56284DAB79CD4C2B3293D20E9E5EAF02AC60ACC93ED87
+
+ТИГЕЛЬ (IV) = Π[0 … 15]                <span class="cm"># 1024 бита, начальное состояние ГОРНа</span>
+ПУЛ         = Π[0 … 31]                <span class="cm"># 2048 бита, источник констант ГОРНа</span></div>
+<p class="small">Цифры π получены рядом Чудновского, цифры e — рядом <code>Σ 1/k!</code>;
+обе процедуры воспроизводятся в <code>kazual/consts_seed.py</code> и сверяются с известными
+префиксами (<code>243F6A8885A308D3…</code> и <code>B7E151628AED2A6A…</code>). Все остальные
+константы проекта — аффинные маски S-box’ов, M₁/M₂, раундовые константы расписания — получаются
+из ГОРНа применением к явным доменным строкам (§4.4), то есть выводятся из Π детерминированно.</p>
+<p class="small" style="margin-bottom:0">Константы стадий ГОРНа читаются из Π по явному правилу
+индексации (<code>ODD[r][i]</code>, <code>LCST[r][i]</code>, <code>ROT[r][i]</code>,
+<code>SIG[r][p]</code>, <code>AFFA/AFFC/SIGB[r][p]</code> — все формулы приведены в §4.2 и в коде).
+Скрытых «закладок» в проекте нет: любое значение восстанавливается из 2048 бит Π.</p>
+</div>
+<h3>3.5 Ортоморфизмы в GF(2¹⁶)</h3>
+<div class="card">
+<p>Ортоморфизм — перестановка σ, для которой <code>x ↦ σ(x) ⊕ x</code> тоже перестановка.
+В схеме Лай–Мэсси он обязателен (§6). Берём аффинную σ в GF(2¹⁶):</p>
+<div class="formula">σ(x) = a ⊗ x ⊕ b,      условие:  a ∉ {0, 1}
+σ(x) ⊕ x = (a ⊕ 1) ⊗ x ⊕ b  — перестановка ⇔ a ⊕ 1 ≠ 0  ⇔ a ≠ 1   ✓</div>
+<p class="note"><b>Нюанс, который часто путают.</b> В циклической группе чётного порядка
+(Z₂¹⁶ у IDEA — сложение по модулю 2¹⁶) ортоморфизмов <b>не существует</b>, поэтому IDEA приходится
+использовать «почти ортоморфизмы». В XOR-группе Z₂¹⁶ (элементарная абелева 2-группа ранга 16)
+ортоморфизмы есть — например, умножение на любой a ∉ {0,1}. Это одна из причин, по которой
+Kazual-512 работает в XOR-группе, а арифметику по модулю 2ⁿ использует только там, где нужны
+переносы (Несущая, Заслонка).</p>
+<p>Константы кросс-диффузии выводятся из ГОРНа с проверкой первообразности
+(порядок = 65535 = 3·5·17·257 проверяется по всем простым делителям):</p>
+<div class="formula">(M₁, M₂) = 0x3423, 0x581D
+порядок M₁ = 65535 ✓    порядок M₂ = 65535 ✓    M₁ ⊗ M₂ = 0x066F
+<span class="cm"># вывод: два первых байта ГОРН(msg="", tag="Kazual-512/H-CROSS/0") с установленным</span>
+<span class="cm"># в 1 младшим битом (нечётность); при непрохождении проверки первообразности</span>
+<span class="cm"># счётчик домена</span>
+<span class="cm"># увеличивается, пока оба элемента не станут первообразными (порядок 65535)</span></div>
+<p class="small" style="margin-bottom:0">Первообразность M₁ и M₂ означает, что умножение на них
+перемешивает все 16 бит чанка: один бит входа расходится по всему чанку. Произведение
+<code>M₁ ⊗ M₂ = 0x066F</code> — единственное запрещённое значение для детерминанта стадии A (§8.1).</p>
+</div>
+<h2 id="s4"><span class="num">§4</span>ГОРН-1024: собственная сжимающая функция</h2>
+<p class="lead">Kazual-512 не использует ни одного внешнего криптографического примитива.
+Всё, для чего обычно берут готовый хеш — вывод констант, предобработка ключа, расширение сидов
+КУЗНИЦЫ, — делает собственная функция <b>ГОРН</b>. Она собрана из тех же кирпичей, что и сам шифр
+(инверсия в GF(2⁸), Cauchy-MDS, ARX), и спроектирована «широкой и мелкой»: вместо одной длинной
+последовательной цепочки — 8 раундов по четыре коротких стадии при ширине 128 байт.</p>
+<h3>4.1 Устройство</h3><div class="card">
+<div class="formula">тигель      S = 16 лейн × 64 бита = 128 байт = 1024 бита
+скорость    rate = 64 байт          ёмкость = 64 байт = 512 бит
+раундов     8
+IV          = Π[0 … 15]              <span class="cm"># первые 1024 бита пула цифр π и e</span>
+
+gorn_perm(S):                        <span class="cm"># внутренняя перестановка, БИЕКЦИЯ</span>
+    for r = 0 … 7:
+        S ← Σ(S, r)                  <span class="cm"># подстановка: 128 байт независимо</span>
+        S ← Μ(S, r)                  <span class="cm"># 8 независимых колоночных Cauchy-MDS 16×16</span>
+        S ← Ρ(S, r)                  <span class="cm"># косой перенос байтов между лейнами</span>
+        S ← Α(S, r)                  <span class="cm"># ARX-лейны: 16 слов независимо</span>
+    return S</div>
+<h4>4.2 Четыре стадии одного раунда</h4>
+<table class="tr"><thead><tr><th>стадия</th><th>формула</th><th>дорожек</th><th>зачем</th></tr></thead><tbody>
+<tr><td class="mono"><b>Σ</b> подстановка</td>
+    <td class="mono small">b[p] ← AFFA[r][p] ⊗ (b[p] ⊕ SIGB[r][p])⁻¹ ⊕ AFFC[r][p] ⊕ SIG[r][p]</td>
+    <td class="n">128</td>
+    <td>нелинейность степени 7 на каждый байт. Берётся <b>биективное</b> семейство (аффинные
+        сопряжения инверсии x²⁵⁴), чтобы внутренняя перестановка оставалась перестановкой —
+        это условие корректности губки. Сопряжения различаются для каждой из 128 позиций.</td></tr>
+<tr><td class="mono"><b>Μ</b> микшер</td>
+    <td class="mono small">for q = 0…7:  col_q ← C₁₆ · col_q</td>
+    <td class="n">8 колонок × 16</td>
+    <td>колоночная Cauchy-MDS 16×16: ветвевое число 17 <b>между лейнами</b> внутри каждой
+        байтовой позиции. Восемь колонок считаются полностью независимо.</td></tr>
+<tr><td class="mono"><b>Ρ</b> перенос</td>
+    <td class="mono small">byte(i, q) → byte((i + 5q + r) mod 16, q)</td>
+    <td class="n">128</td>
+    <td>сдвиг байтов между лейнами с наклоном, зависящим от позиции и раунда. Без него Μ
+        перемешивал бы только «по вертикали». Биекция, стоит 0 операций (перестановка индексов).</td></tr>
+<tr><td class="mono"><b>Α</b> ARX-лейны</td>
+    <td class="mono small">x ← (x · ODD[r][i]) mod 2⁶⁴;<br>x ← x ⊕ (x ≫ 29);<br>x ← rotl(x, ROT[r][i]);<br>x ← (x + LCST[r][i]) mod 2⁶⁴</td>
+    <td class="n">16</td>
+    <td>переносы и умножение по модулю 2⁶⁴ — вторая алгебра. Все четыре шага биективны
+        (нечётный множитель, unipotent-сдвиг, поворот, сложение с константой).
+        16 лейн считаются независимо.</td></tr>
+</tbody></table>
+<div class="formula"><span class="cm"># константы стадий читаются из пула Π (32 слова по 64 бита) по явному правилу:</span>
+ODD[r][i]   = ( rotl64(Π[(r+i) mod 32], (5r+3i+7) mod 64) ⊕ Π[(7r+5i+11) mod 32] ) | 1
+LCST[r][i]  =   rotl64(Π[(3r+11i+13) mod 32], (11r+7i+1) mod 64) ⊕ Π[(5r+13i+17) mod 32]
+ROT[r][i]   = 1 + ( rotl64(Π[(3r+5i+1) mod 32], (r+i) mod 64) ≫ ((r+3i) mod 8)·8 ) mod 61
+SIG[r][p]   = байт (p·7+3r) mod 8 слова Π[(r+p) mod 32]
+SIGB[r][p]  = байт (p+5r) mod 8   слова Π[(3p+r+9) mod 32]
+AFFA[r][p]  = nz( байт (3p+r) mod 8 слова Π[(5r+p) mod 32] )
+<span class="cm"># nz(x) = x при x ≠ 0, иначе 0x5A — подстановка для ФИКСИРОВАННОГО пула:</span>
+<span class="cm"># отбраковка к конечному пулу неприменима, а нулевой множитель сделал бы</span>
+<span class="cm"># Σ-слой постоянным и разрушил биективность перестановки. Фактически ни</span>
+<span class="cm"># один используемый байт пула не равен нулю — nz не срабатывает</span>
+<span class="cm"># (проверяется самопроверкой: min AFFA > 0, Σ-таблицы биективны).</span>
+AFFC[r][p]  = байт (5p+11r) mod 8 слова Π[(p+2r+5) mod 32]</div>
+</div>
+<h3>4.3 Губка, свёртка и режим расширения</h3><div class="card">
+<div class="formula">_fold(S) → 512 бит:                 <span class="cm"># 8 выходных слов из 16</span>
+    out[i] = S[i] ⊕ rotl64(S[i+8], 17) ⊕ rotl64(S[(i+3) mod 8 + 8], 41)
+                   ⊕ rotl64(S[(2i+5) mod 8 + 8], 53)
+<span class="cm"># блок «низ-низ» равен единице ⇒ ранг свёртки ровно 512 (проверено)</span>
+
+_pad(msg, tag):                      <span class="cm"># доменное разделение + длина</span>
+    body = tag ‖ 0x1F ‖ msg ‖ 0x80 ‖ 0x00… ‖ len64be(msg),  |body| ≡ 0 (mod rate)
+
+gorn_hash(msg, tag) → 512 бит:
+    S ← IV
+    for B in _pad(msg, tag):          <span class="cm"># блоки по 64 байта в верхнюю половину тигля</span>
+        S[0 … 63] ← S[0 … 63] ⊕ B
+        S ← gorn_perm(S)
+    return _fold(gorn_perm(S))
+
+gorn_expand(seed, tag, nbytes):      <span class="cm"># режим расширения для КУЗНИЦЫ</span>
+    S ← IV; впитать seed с tag; далее непрерывный отжим:
+    while |out| &lt; nbytes:  S ← gorn_perm(S);  out ← out ‖ _fold(S)
+<span class="cm"># одна перестановка на 64 байта выхода — вдвое дешевле, чем gorn_hash в счётчиковом режиме</span></div>
+<p class="small">Длинные входы можно впитывать <b>деревом</b>: блоки одной группы из 16
+независимы до первого <code>gorn_perm</code>, поэтому группа обрабатывается 16-дорожечно, а не
+последовательно, как в Меркла–Дамгорде. В самом Kazual-512 входы короткие (тег-строка, 64-байтовый
+ключ, 64-байтовые сиды), поэтому всегда достаточно одного-двух блоков.</p>
+</div>
+<h3>4.4 Что измерено</h3><div class="card">
+<table><thead><tr><th>свойство</th><th class="n">результат</th><th>как проверено</th></tr></thead><tbody>
+<tr><td>внутренняя перестановка биективна</td><td class="n good">да</td><td class="small">построен явный обратный ход для всех четырёх стадий; 40/40 случайных тиглей вернулись в себя</td></tr>
+<tr><td>ранг свёртки <code>_fold</code></td><td class="n good">512 из 512</td><td class="small">Гаусс по GF(2) на 1024 единичных входах</td></tr>
+<tr><td>лавина дайджеста (случайные пары)</td><td class="n good">256.0 / 228…287</td><td class="small">150 пар случайных 512-битных входов, идеал 256</td></tr>
+<tr><td>строгий лавинный критерий (SAC)</td><td class="n good">256.2 / 221…289</td><td class="small">все 512 однобитовых входов, идеал 256</td></tr>
+<tr><td>коллизии</td><td class="n good">0 на 3000</td><td class="small">3000 случайных 256-битных входов</td></tr>
+<tr><td>стоимость одной перестановки</td><td class="n good">0.41 мс</td><td class="small">оптимизированная эталонная реализация на Python (Μ и Ρ слиты в один проход по 1024-битному слову), 8 раундов × 4 стадии; неоптимизированная — 2.6 мс на той же машине (Python 3.11, x86-64)</td></tr>
+</tbody></table>
+<h4>Почему своя функция, а не готовая</h4>
+<table><thead><tr><th>свойство</th><th>ГОРН-1024</th><th>классическая последовательная конструкция</th></tr></thead><tbody>
+<tr><td>глубина схемы</td><td class="good">8 раундов × 4 коротких стадии = 32 уровня</td>
+    <td>80 последовательных шагов, каждый с 64-битной зависимой цепочкой</td></tr>
+<tr><td>ширина параллелизма</td><td class="good">Σ — 128 дорожек, Μ — 8 колонок × 16 строк, Α — 16 лейн</td>
+    <td>1 (внутри шага — 8 слов, но шаги строго последовательны)</td></tr>
+<tr><td>зависимость от внешних примитивов</td><td class="good">нет: только GF(2⁸), Cauchy-MDS, ARX, π и e</td>
+    <td>готовая функция из стандарта</td></tr>
+<tr><td>обратимость внутренней перестановки</td><td class="good">да, проверяется явным обратным ходом</td>
+    <td>да</td></tr>
+<tr><td>стойкость к прообразу (оценка)</td><td class="mid">≈ 2⁵¹² (ёмкость 512 бит) — <b>эвристика</b>, не доказательство</td>
+    <td>2⁵¹²</td></tr>
+<tr><td>коллизии (оценка)</td><td class="mid">≈ 2²⁵⁶ — ограничено ёмкостью, как у любой губки</td>
+    <td>2²⁵⁶</td></tr>
+</tbody></table>
+<p class="small" style="margin-bottom:0"><b>Честная оговорка.</b> ГОРН моложе и менее изучен, чем
+стандартные хеши: его стойкость — это оценка «губка с биективной перестановкой и ёмкостью 512 бит»,
+а не результат криптоанализа. В Kazual-512 он применяется только внутри расписания ключей,
+где работает как KDF: даже частичное ослабление ГОРНа не отменяет того, что 32 раунда
+двутактной GFN с ветвевым числом 65 дают собственную лавину (§9).</p>
+</div>
+<h2 id="s5"><span class="num">§5</span>КУЗНИЦА: динамические таблицы из раундового ключа</h2>
+<p class="lead">Статическое ядро (§3) одинаково для всех ключей — это фундамент, свойства которого
+перебраны и не могут «поехать». Поверх него КУЗНИЦА выплавляет из 512-битного сида набор
+<b>ключезависимых таблиц</b>. Главный конструктивный принцип: <b>ни одно изделие КУЗНИЦЫ не может
+ухудшить ни один параметр ядра</b>. Ниже каждое изделие снабжено доказательством этого.</p>
+<h3>5.1 Что выплавляется</h3><div class="card">
+<table class="tr"><thead><tr><th>изделие</th><th>куда идёт</th><th class="n">размер</th><th>что сохраняется (доказано)</th></tr></thead><tbody>
+<tr><td><code>A[ℓ][i]</code>, <code>B[ℓ][i]</code> — аффинная маска <code>x ↦ A⊗x ⊕ B</code></td><td class="small">вход каждого такта F</td><td class="n">192 Б</td><td class="small">A ≠ 0 ⇒ маска — биекция ⇒ <b>нулевой байт остаётся нулевым</b>: счёт активных S-box’ов не меняется. δ и NL подстановки <code>S(A⊗x⊕B)</code> равны δ и NL самой S (аффинная эквивалентность).</td></tr>
+<tr><td><code>C[i]</code>, <code>D[i]</code> — аффинный эпилог</td><td class="small">выход F</td><td class="n">64 Б</td><td class="small">то же: биекция, сохраняет вес различия.</td></tr>
+<tr><td><code>φ[ℓ]</code> — назначение семейств S-box’ов</td><td class="small">каждый такт F</td><td class="n">96 Б</td><td class="small">φ — перестановка <b>фиксированного мультимножества</b> {11×S₁, 11×S₂, 10×S₃}. Значит в каждом такте ровно 22 позиции с δ = 2 и 10 с δ = 4, и граница образа F не зависит от ключа (§7.4).</td></tr>
+<tr><td><code>π[ℓ]</code>, <code>ρ[ℓ]</code> — перестановки Коши</td><td class="small">линейный слой каждого такта</td><td class="n">192 Б</td><td class="small">B(M) = n+1 при любых π, ρ (§3.3). Плюс: M⁻¹ бесплатна.</td></tr>
+<tr><td><code>Π</code>, <code>Ρ</code> — перестановки Коши Веера</td><td class="small">стадия B пол-раунда</td><td class="n">128 Б</td><td class="small">B(M) = 65 при любых Π, Ρ; нижняя половина без нулей ⇒ вес Δz = 1 ⇒ вес Δ′ = 32 (§8.3).</td></tr>
+<tr><td><code>a[c]</code>, <code>a′[c]</code> — множители ортоморфизма</td><td class="small">стадия A пол-раунда</td><td class="n">128 Б</td><td class="small">отбраковка {0,1} и условия <code>(a⊕1)(a′⊕1) ≠ M₁M₂</code> ⇒ A — ортоморфизм всей 512-битной XOR-группы (§8.1).</td></tr>
+<tr><td><code>α</code>, <code>m</code> (нечётное), <code>c</code> — параметры Несущей</td><td class="small">Предтакт F и стадия C пол-раунда</td><td class="n">2312 Б на ключ<br>(136 Б на Предтакт F, 272 Б на пол-раунд H)</td><td class="small">каждый подшаг треуголен и обратим при любом m ⇒ Несущая — биекция при любом ключе; нечётность m гарантирует, что умножение — перестановка Z₂⁶⁴.</td></tr>
+<tr><td><code>k₁</code>, <code>k₂</code>, <code>s</code> — параметры Заслонки</td><td class="small">Предтакт F</td><td class="n">72 Б</td><td class="small">FL/FL⁻¹ треугольны ⇒ биекция при любом ключе; ненулевые ключи не требуются.</td></tr>
+</tbody></table>
+<p class="note">Логический объём всех динамических изделий на ключ — <b>6928 байт</b> (5 × 752 Б на вызов F + 6 × 528 Б на пол-раунд). В табличной реализации, где маска и S-box слиты в одну 256-байтовую таблицу на позицию, это раскрывается в 223 КБ на ключ — сознательный обмен памяти на отсутствие ветвлений в горячем цикле.</p>
+</div>
+<h3>5.2 Как выплавляется</h3><div class="card">
+<div class="formula">forge(seed₅₁₂, tag) → material:
+    material ← gorn_expand(seed, tag, N)        <span class="cm"># Н байт, одна перестановка ГОРНа на 64 байта</span>
+    rd ← Reader(material)                        <span class="cm"># последовательный разбор, порядок строгий</span>
+
+    перестановка π ∈ S_n:   v ← rd.take(⌈(log₂ n! + 96)/8⌉);  π ← lehmer(v, n)
+    мультимножество φ:      v ← rd.take(⌈(log₂ N_φ + 96)/8⌉); φ ← lehmer_ms(v, pattern)
+    единица поля GF(2⁸):    a ← rd.unit8()       <span class="cm"># отбраковка нуля</span>
+    единица поля GF(2¹⁶):   a ← rd.unit16()      <span class="cm"># отбраковка {0,1}</span>
+    нечётный множитель:     m ← rd.odd(w)        <span class="cm"># x | 1</span></div>
+<h4>Три способа взять случайный объект — и все три ровно равномерны</h4>
+<table class="tr"><thead><tr><th>объект</th><th>метод</th><th>смещение</th><th>цена</th></tr></thead><tbody>
+<tr><td>перестановка n элементов</td>
+    <td><b>код Лемера</b>: целое v приводится по модулю n!, затем разворачивается в перестановку</td>
+    <td class="good">≤ 2⁻⁹⁶ (взято 96 бит запаса сверх ⌈log₂ n!⌉)</td>
+    <td>O(n²) один раз на ключ</td></tr>
+<tr><td>перестановка мультимножества (назначение S-box’ов 11/11/10)</td>
+    <td>тот же код Лемера по числу N<sub>φ</sub> = 32!/(11!·11!·10!) ≈ 2⁴⁵·⁴</td>
+    <td class="good">≤ 2⁻⁹⁶</td><td>O(n²)</td></tr>
+<tr><td>ненулевой байт GF(2⁸)*</td><td><b>отбраковка</b>: читать байты, пока не встретится ненулевой</td>
+    <td class="good">ровно 0</td><td>ожидаемо 256/255 = 1.004 чтения</td></tr>
+<tr><td>элемент GF(2¹⁶) \ {0,1}</td><td><b>отбраковка</b>: читать слова, пока значение &gt; 1</td>
+    <td class="good">ровно 0</td><td>ожидаемо 65536/65534 = 1.00003 чтения</td></tr>
+<tr><td>нечётный множитель mod 2ʷ</td><td><code>x | 1</code></td>
+    <td class="good">ровно 0 (каждое нечётное достигается ровно двумя входами)</td><td>1 операция</td></tr>
+</tbody></table>
+<p class="small" style="margin-bottom:0">Расход материала при отбраковке непостоянен, поэтому на
+каждый набор выделяется бюджет с запасом, а переполнение проверяется в коде явной проверкой (исключение, а не assert — работает и под python -O).
+Никаких «подмен запрещённого значения константой» в проекте нет: запрещённые значения
+<b>отбраковываются</b>, а не переназначаются, поэтому распределение ключевого материала
+равномерно в строгом смысле.</p>
+</div>
+<h3>5.3 Почему это «полезная странность», а не усложнение</h3><div class="card">
+<ul class="clean">
+<li><b>Нечего предвычислять.</b> Линейные оболочки, таблицы пересечений, алгебраические системы —
+всё, что атакующий мог бы построить один раз и переиспользовать для разных ключей, — здесь
+существует в 2⁵¹² вариантах. Это прямое следствие того, что π, ρ и φ ключезависимы.</li>
+<li><b>Скользящие (slide) атаки теряют опору.</b> Даже если бы два раунда имели одинаковые подключи,
+их таблицы различаются: π, ρ, φ, маски и параметры Несущей берутся из разных выходов расписания.</li>
+<li><b>Структурные атаки на фиксированный линейный слой невозможны.</b> В обычном SPN матрица
+известна, и для неё можно заранее найти «удобные» подпространства (инвариантные подпространства,
+атаки на частичную диффузию). Здесь матрица — элемент множества из (32!)² ≈ 2¹⁶⁸ вариантов на такт,
+причём все они имеют одно и то же ветвевое число: худший случай не наступает, но и «удобных»
+матриц атакующий выбрать не может.</li>
+<li><b>Цена — ноль по стойкости.</b> Это ключевой пункт: δ, NL, ветвевое число, счёт активных
+S-box’ов, необратимость F, биективность H — всё доказуемо не зависит от того, какие именно
+таблицы выдала КУЗНИЦА (§5.1, §3.3).</li>
+<li><b>Цена по памяти — заметна и названа честно:</b> 223 КБ динамических таблиц на ключ в табличной
+реализации. Это плата за отсутствие ветвлений; в bitslice-реализации (§12.3) раскрывать таблицы
+не нужно вовсе.</li>
+</ul>
+</div>
+<h2 id="s6"><span class="num">§6</span>Каркас Лай–Мэсси и пять закрытых дыр</h2>
+<p class="lead">Канон схемы Лай–Мэсси: из разности половин <code>Δ = L ⊕ R</code> раундовая
+функция делает <code>T</code>, и <b>один и тот же T прибавляется к обеим половинам</b>. Отсюда главное
+преимущество перед Фейстелем (обе половины меняются каждый раунд) и главная дыра (разность инвариантна).</p>
+<div class="card"><h4 style="margin-top:0">Канон (без модификаций)</h4>
+<div class="formula">(L′₀, R′₀) = H(L₀, R₀)
+для i = 0 … r−1:
+    T_i     = F(L′_i ⊕ R′_i, K_i)            <span class="cm"># F НЕ обязана быть обратимой</span>
+    (L′,R′) = H(L′_i ⊕ T_i, R′_i ⊕ T_i)
+C = (L′_r, R′_r)</div>
+<p class="small"><b>Почему это обратимо без F⁻¹.</b> При дешифровании мы сначала применяем H⁻¹ и
+получаем пару <code>(L⊕T, R⊕T)</code>. Её разность равна <code>L ⊕ R</code> — T сокращается!
+Значит, <code>T = F(L⊕R, K)</code> вычисляется заново, и половины восстанавливаются одним XOR.
+Требуется обратимость <b>только</b> у H. Именно это позволяет взять необратимую F с APN-подстановками.</p></div>
+<h3>Пять известных слабостей схемы и как каждая закрыта</h3>
+<table><thead><tr><th>#</th><th>дыра канона</th><th>последствие, если не чинить</th><th>решение в Kazual-512</th></tr></thead><tbody>
+<tr><td class="n">1</td><td><b>Инвариантность разности.</b> Прибавление одного T к обеим половинам сохраняет <code>L ⊕ R</code>, поэтому без H выполняется <code>L₀⊕R₀ = L_r⊕R_r</code></td><td>тривиальный разделитель за 1 запрос: схема отличима от случайной перестановки</td><td>пол-раунд <b>H</b> применяется после каждого прибавления T, включая начальное (§8). H — биекция, и <b>Δ′ = u⊕v есть проекция нижней половины Веера</b>, у которой нет нулевых элементов: Δ′ = 0 только если разница на входе H нулевая. Проверено для всех 64 единичных различий: вес Δ′ = 32 из 32.</td></tr>
+<tr><td class="n">2</td><td><b>Мало раундов.</b> Доказано (Воденэ, ASIACRYPT’99): 3 раунда дают CPA-стойкость, 4 раунда — CCA/SPRP в пределах birthday bound; 2 раунда <b>не</b> псевдослучайны</td><td>2-раундовая схема отличима; 3-раундовая уязвима к chosen-ciphertext</td><td><b>5 раундов</b> = доказанный порог CCA (4) + 1 запасной. Каждый раунд при этом содержит 3 SPN-такта, то есть всего 15 нелинейных слоёв — больше, чем 9 в AES-128, — плюс 6 Несущих и 6 Вееров.</td></tr>
+<tr><td class="n">3</td><td><b>Фиксированный линейный σ.</b> Если H известна и линейна, её структура используется для построения линейных соотношений между раундами</td><td>ослабление линейной и алгебраической стойкости, атаки на 3–4 раунда</td><td>H <b>зависит от ключа</b> и <b>нелинейна</b>: стадия A даёт 4·16 = 1024 бита ключевых множителей, стадия C — 16 подшагов ARX с ключевыми поворотами, нечётными множителями и слагаемыми, стадия B — ключевые перестановки Коши MDS 64×64. Линейных соотношений «поверх H» не остаётся.</td></tr>
+<tr><td class="n">4</td><td><b>Односторонний H.</b> В каноне <code>H(L,R) = (σ(L), R)</code>: правая половина проходит пол-раунд нетронутой — аналог «балласта» Фейстеля</td><td>половина состояния не перемешивается в H; медленнее диффузия, возможны симметрии</td><td><b>трёхстадийный H</b>: кросс-члены M₁⊗R и M₂⊗u в стадии A, затем Несущая, затем Веер — полная MDS 64×64 с ветвевым числом <b>65</b>, то есть 1 активный байт на входе H даёт 64 на выходе. Измерено: разница, входящая в F, имеет вес <b>31 байт из 32</b> в минимуме и 31.9 в среднем по всем пяти раундам.</td></tr>
+<tr><td class="n">5</td><td><b>Нет забеливания.</b> Первый и последний раунды работают с «голым» текстом</td><td>атаки на крайние раунды, связанные ключи, тривиальные соотношения</td><td><b>pre-whitening</b> (W_L, W_R) до H₀ и <b>post-whitening</b> (W′_L, W′_R) после H₅ — 1024 бита независимого ключевого материала, каждый из собственного выхода расписания. Внутри F забеливание растворено в аффинных масках каждого такта.</td></tr>
+</tbody></table>
+<div class="warn"><b>Что доказано и что нет.</b> Теорема Воденэ сформулирована для канонического
+<code>H(L,R) = (σ(L),R)</code> с фиксированным ортоморфизмом σ. Наш H устроен иначе, поэтому прямая
+ссылка на теорему не работает. Вместо неё здесь три доказанных утверждения (§8):
+(i) стадия A — ортоморфизм всей 512-битной XOR-группы при любом допустимом ключе;
+(ii) H — биекция, и Δ′ = 0 ⇔ Δ = 0;
+(iii) Веер — MDS с ветвевым числом 65 при любом ключе. Плюс измеренная лавина и вес Δ на входе F.
+Формальная редукция усиленного каркаса к SPRP остаётся открытой (§15.1), но она опирается
+на перечисленные доказанные факты, а не на аналогию.</div>
+<h2 id="s7"><span class="num">§7</span>F: трёхтактный необратимый SPN</h2>
+<p class="lead">F принимает разность половин Δ (256 бит) и выдаёт T (256 бит). F <b>необратима</b> —
+и это не издержка, а ресурс: необратимость куплена APN-подстановками с δ = 2. Структура —
+«Предтакт → три Такта → эпилог», где Предтакт целиком биективен и поэтому не ослабляет
+ни одной границы Тактов.</p>
+<div class="card"><div class="formula">
+F(X, ft):                                  <span class="cm"># X — 32 байта, ft — таблицы КУЗНИЦЫ</span>
+
+  <span class="cm">--- ПРЕДТАКТ (биекция) ----------------------------------------</span>
+  Заслонка:  X как 8 слов по 32 бита; чётные ← FL(x, k₁, k₂, s), нечётные ← FL⁻¹(x, k₁, k₂, s)
+  Несущая:   X как 4 слова по 64 бита; 4 фазы по 2 независимые пары (ARX, §7.2)
+
+  <span class="cm">--- ТРИ ТАКТА -------------------------------------------------</span>
+  for ℓ = 0, 1, 2:
+      X[i] ← S<sub>φ[ℓ][i]</sub>( A[ℓ][i] ⊗ X[i] ⊕ B[ℓ][i] )      <span class="cm"># маска + 32 S-box’а параллельно</span>
+      X    ← M<sub>π[ℓ],ρ[ℓ]</sub> · X                              <span class="cm"># динамическая Cauchy-MDS 32×32</span>
+
+  <span class="cm">--- ЭПИЛОГ ----------------------------------------------------</span>
+  X[i] ← C[i] ⊗ X[i] ⊕ D[i]
+  return X
+</div>
+<h4>Паттерн назначения S-box’ов</h4>
+<p>φ[ℓ] — перестановка фиксированного мультимножества <code>{11×S₁, 11×S₂, 10×S₃}</code>,
+выплавляемая КУЗНИЦЕЙ из сида раунда. Свойства (все следуют из того, что это перестановка
+одного и того же мультимножества):</p>
+<ul class="clean small">
+<li>в каждом такте распределение <b>S₁ — 11, S₂ — 11, S₃ — 10</b> независимо от ключа;</li>
+<li>22 позиции из 32 всегда используют APN-подстановки (δ = 2) и всегда 22 позиции имеют образ
+    из 86 значений — граница необратимости F (§7.4) одинакова для всех ключей;</li>
+<li>худший случай для дифференциальной оценки — все 32 позиции S₃ — <b>недостижим</b>,
+    поэтому оценка p ≤ (2⁻⁶)^act корректна с act ≥ 34, а реалистичная оценка использует δ = 2
+    для 22 позиций;</li>
+<li>соседние позиции в такте, как правило, используют разные семейства, а за три такта позиции
+    перемешиваются; φ — не фиксированное правило вида <code>(i+ℓ) mod 3</code>, а ключезависимая
+    перестановка мультимножества, что лишает атакующего возможности планировать «дорожку»
+    по одному семейству.</li>
+</ul>
+</div>
+<h3>7.1 Заслонка: FL-подслой с ключевым поворотом</h3><div class="card">
+<div class="formula">X рассматривается как 8 слов по 32 бита. Все 8 обрабатываются НЕЗАВИСИМО.
+
+FL(x, k₁, k₂, s):            <span class="cm"># чётные позиции</span>
+    x₁ ← x ≫ 16 ;  x₂ ← x & 0xFFFF
+    x₁ ← x₁ ⊕ rotl₃₂(x₂ & k₁, s)
+    x₂ ← x₂ ⊕ (x₁ | k₂)
+    return (x₁ ≪ 16) | x₂
+
+FL⁻¹(y, k₁, k₂, s):          <span class="cm"># нечётные позиции — обратный порядок</span>
+    y₁ ← y ≫ 16 ;  y₂ ← y & 0xFFFF
+    y₂ ← y₂ ⊕ (y₁ | k₂)
+    y₁ ← y₁ ⊕ rotl₃₂(y₂ & k₁, s)
+    return (y₁ ≪ 16) | y₂</div>
+<p class="small">Обе ветви треугольны, поэтому Заслонка биективна при любых k₁, k₂, s
+(проверено на 200 прогонах). Смысл: <code>& k₁</code> и <code>| k₂</code> — единственные места
+в F, где ключ входит <b>мультипликативно по битам</b>, а не через XOR и не через GF(2⁸). Это
+поднимает алгебраическую степень по битам ключа и ломает линейность забеливания: соотношение
+вида «маска = XOR-константа» вход S-слоя уже не описывает. Чередование FL и FL⁻¹ по позициям
+делает так, что половина слов преобразована «вперёд», половина — «назад», и никакой симметрии
+между чётными и нечётными позициями не остаётся.</p>
+</div>
+<h3>7.2 Несущая: ARX-микшер</h3><div class="card">
+<div class="formula">Несущая(w[0 … W−1], par, wb):                <span class="cm"># wb = 64 в Предтакте, wb = 64 в H</span>
+  for t = 0 … T−1:                            <span class="cm"># T фаз</span>
+      for (j, k) in пары(t):                  <span class="cm"># W/2 НЕЗАВИСИМЫХ пар → SIMD</span>
+          x    ← ( rotl(w[j], α[t]) + (w[k] · m[t]) mod 2ʷᵇ ) mod 2ʷᵇ
+          w[j] ← x
+          w[k] ← w[k] ⊕ x ⊕ c[t]
+
+пары(t):  t чётное → (0,1), (2,3), (4,5), (6,7)          <span class="cm"># соседние</span>
+          t нечётное → (0,W−1), (2,1), (4,3), (6,5)      <span class="cm"># перекрёстные</span>
+
+Несущая⁻¹: фазы в обратном порядке, в каждой паре
+          w[k]_старое ← w[k] ⊕ w[j] ⊕ c[t]
+          w[j]_старое ← rotr( w[j] − (w[k]_старое · m[t]),  α[t] )</div>
+<p>Каждый подшаг — это ровно один «узел» смешанной алгебры: поворот (битовая перестановка),
+умножение по модулю 2ʷᵇ (нелинейность переносов в обе стороны), сложение по модулю 2ʷᵇ
+(нелинейность переноса вверх) и XOR (линейность). Подшаг треуголен: <code>w[j]</code> обновляется
+первым и использует <b>старое</b> <code>w[k]</code>, а <code>w[k]</code> использует <b>новое</b>
+<code>w[j]</code>. Отсюда обратимость без обращения умножения — <code>m</code> может быть любым,
+но КУЗНИЦА выдаёт нечётные, чтобы умножение само было перестановкой Z₂⁶⁴.</p>
+<div class="grid g2"><div class="card tight" style="margin:0"><h4 style="margin-top:0">Измеренная диффузия</h4>
+<p class="small" style="margin-top:0">8 слов по 64 бита, перевёрнут 1 бит входа:</p>
+<table class="tr"><thead><tr><th class="n">фаза</th><th class="n">бит различия из 512</th><th class="n">слов из 8</th></tr></thead><tbody>
+<tr><td class="n">1</td><td class="n">2</td><td class="n">2</td></tr>
+<tr><td class="n">2</td><td class="n">55</td><td class="n">4</td></tr>
+<tr><td class="n">3</td><td class="n">165</td><td class="n">6</td></tr>
+<tr class="hl"><td class="n">4</td><td class="n">260</td><td class="n">8</td></tr>
+<tr><td class="n">5</td><td class="n">244</td><td class="n">8</td></tr>
+<tr><td class="n">6</td><td class="n">240</td><td class="n">8</td></tr>
+</tbody></table><p class="small" style="margin-bottom:0">Полное покрытие слов достигается за <b>4 фазы</b> — ровно столько стоит в Предтакте F (W = 4, 2 пары) и в пол-раунде H (W = 8, 4 пары); те же W и T сохранены и в Kazual-64 (§13), где слова Несущей у́же (8 бит), но их количество и чередование спариваний идентичны. Первая фаза даёт только 2 бита: это «прорастание» переноса, и оно безопасно, потому что Несущая нигде не является единственным источником диффузии.</p></div>
+<div class="card tight" style="margin:0"><h4 style="margin-top:0">Алгебраическая степень</h4>
+<div class="formula">Модель: wb = 8, W = 2, T = 3  (16 входных бит,
+полный перебор 65536 значений, ANF по Мёбиусу)
+
+  Несущая целиком      → степень 15 из 16
+  только a + b         → степень  8 из 16
+  только a · b         → степень  9 из 16
+  только a ⊕ b         → степень  1 из 16</div>
+<p class="small" style="margin-bottom:0">Смешение сложения и умножения по модулю 2ʷ поднимает степень
+до <b>15/16 = 94%</b> возможной уже на трёх фазах, тогда как любая однооперационная схема
+остаётся на 8–9. Экстраполяция на wb = 64: степень по битам слова насыщается до 63–64 за одну
+фазу, поэтому линеаризация (XLS) и метод Грёбнера неприменимы — число мономов порядка 2⁶³ на слово
+(§11.4).</p>
+</div></div>
+</div>
+<h3>7.3 Wide-trail: доказуемая граница и измеренная</h3><div class="card">
+<div class="formula">Динамическая MDS имеет ветвевое число 33 ПРИ ЛЮБОМ КЛЮЧЕ (§3.3).
+Аффинная маска A⊗x⊕B с A ≠ 0 переводит ненулевую разницу в ненулевую ⇒ счёт активных
+S-box’ов не меняется. Предтакт — биекция ⇒ ненулевая разница на входе F остаётся ненулевой
+на входе первого такта. Значит для act₁, act₂, act₃ — чисел активных S-box’ов в трёх тактах:
+
+    act₁ + act₂ ≥ 33 ,   act₂ + act₃ ≥ 33
+    act₁ + act₂ + act₃ ≥ 33 + act₃ ≥ 33 + 1 = <b>34</b>       <span class="cm"># для любого ключа</span>
+
+худший случай (все активные — биективный S₃, δ = 4):
+    p(один вызов F) ≤ (4/256)^34 = (2⁻⁶)^34 = 2⁻²⁰⁴
+реалистичный случай (22 позиции из 32 — APN, δ = 2):
+    p(один вызов F) ≈ (2⁻⁷)²³ · (2⁻⁶)¹¹ ≈ 2⁻²²⁷
+5 раундов, худший случай:  p ≤ (2⁻²⁰⁴)⁵ = 2⁻¹⁰²⁰
+порог осмысленности для блока 512 бит:  birthday bound = 2²⁵⁶</div>
+<p>Измерение на фактических парах значений (не на «разнице в вакууме») даёт существенно большие числа — Предтакт успевает рассовать один байт различия по многим позициям ещё до первого S-слоя:</p>
+<table class="tr"><thead><tr><th>что измерялось</th><th class="n">проб</th><th class="n">min активных S-box’ов</th><th class="n">p ≤ (2⁻⁶)^min</th></tr></thead><tbody>
+<tr><td>полный перебор всех различий весом 1 байт в F (32 позиции × 255 значений)</td><td class="n">8160</td><td class="n good">82</td><td class="n">2<sup>−492</sup></td></tr>
+<tr><td>случайные трейлы через полный шифр: за 1 вызов F</td><td class="n">750</td><td class="n good">93</td><td class="n">2<sup>−558</sup></td></tr>
+<tr><td>случайные трейлы через полный шифр: за 2 раунд(а)</td><td class="n">750</td><td class="n good">188</td><td class="n">2<sup>−1128</sup></td></tr>
+<tr><td>случайные трейлы через полный шифр: за 3 раунд(а)</td><td class="n">750</td><td class="n good">283</td><td class="n">2<sup>−1698</sup></td></tr>
+<tr><td>случайные трейлы через полный шифр: за 4 раунд(а)</td><td class="n">750</td><td class="n good">377</td><td class="n">2<sup>−2262</sup></td></tr>
+<tr><td>случайные трейлы через полный шифр: за 5 раунд(а)</td><td class="n">750</td><td class="n good">473</td><td class="n">2<sup>−2838</sup></td></tr>
+</tbody></table>
+<p class="note">Пример худшего найденного 5-раундового трейла (активных S-box’ов по раундам): <code>[94, 94, 95, 94, 96]</code>. Различия брались весом 1–8 байт, 3 независимых ключа, пары значений — фактические промежуточные состояния шифра.</p>
+<div class="ok"><b>Вывод.</b> Доказуемо p ≤ 2⁻¹⁰²⁰ за пять раундов; измерено p ≤ 2<sup>−2838</sup>.
+И то и другое на 76+ порядков ниже birthday bound 2⁻²⁵⁶, то есть дифференциальная характеристика
+ненаходима в принципе. Именно тяжёлый линейный слой (ветвевое число 33 в F и 65 в H) позволяет
+иметь 5 раундов: с иерархической перестановкой и ветвевым числом ~10 потребовалось бы 25–30 раундов.</div>
+</div>
+<h3>7.4 Необратимость — количественно</h3>
+<div class="grid g2"><div class="card tight" style="margin:0">
+<p class="small" style="margin-top:0"><b>Полный Kazual-512.</b> В первом S-слое 22 позиций из 32 используют APN-подстановки с образом 86 значений, 10 позиций — биективный S₃. φ — перестановка фиксированного мультимножества, поэтому эти числа <b>одинаковы для всех ключей</b>:</p>
+<div class="formula">|image(F)| ≤ 86²² · 256¹⁰ = 2^221.4   из 2²⁵⁶
+→ не менее 34.6 бит входа теряются безвозвратно уже на первом слое</div>
+<p class="small" style="margin-bottom:0">F не имеет обратного хода — и он не нужен: каркас Лай–Мэсси пересчитывает T по разности половин (§6). Предтакт и эпилог биективны, поэтому вся потеря информации приходится на S-слой.</p></div>
+<div class="card tight" style="margin:0">
+<p class="small" style="margin-top:0"><b>F-микро (измерительная инстанция, 16 бит).</b> Тот же Предтакт без Заслонки, те же три такта, та же динамическая Cauchy-MDS, но n = 2 байта. Перебраны <b>все 65536</b> входов:</p>
+<div class="formula">|image(F_микро)| = 3602 из 65536  ≈ 2<sup>11.81</sup></div>
+<p class="small" style="margin-bottom:0">Из 65536 возможных выходов достижимы лишь 3602. Ровно это свойство и позволяет брать APN-подстановки с δ = 2: платой за δ = 2 является необратимость, а в каркасе Лай–Мэсси она бесплатна.</p></div></div>
+<h2 id="s8"><span class="num">§8</span>H: пол-раунд «ортоморфизм → несущая → веер»</h2>
+<p class="lead">H — единственная часть шифра, от которой требуется обратимость: каркас Лай–Мэсси
+инвертирует F пересчётом, а H — по-настоящему. H составлен из трёх стадий, каждая из которых
+отвечает за свой тип перемешивания и каждая из которых проверяема по отдельности.</p>
+<div class="card"><div class="formula">
+H(L, R, hp) → (u_out, v_out):               <span class="cm"># L, R — по 32 байта</span>
+
+  <span class="cm">--- СТАДИЯ A: ортоморфизм (32 чанка по 16 бит, GF(2¹⁶), 16 дорожек) ---</span>
+  for c = 0 … 15:
+      u[c] = a[c]  ⊗₁₆ L[c] ⊕ b[c]  ⊕ M₁ ⊗₁₆ R[c]
+      v[c] = a′[c] ⊗₁₆ R[c] ⊕ b′[c] ⊕ M₂ ⊗₁₆ u[c]      <span class="cm"># треугольно: u входит в v</span>
+  z ← u ‖ v                                            <span class="cm"># 64 байта</span>
+
+  <span class="cm">--- СТАДИЯ C: Несущая (8 слов × 64 бита, 4 фазы по 4 пары) --------------</span>
+  z ← Несущая(z, hp.weave, 64)                          <span class="cm"># §7.2, биекция</span>
+
+  <span class="cm">--- СТАДИЯ B: Веер (динамическая Cauchy-MDS 64×64, 64 дорожки) ---------</span>
+  t ← M<sub>Π,Ρ</sub> · z                                        <span class="cm"># 64 байта, ветвевое число 65</span>
+  p ← t[0 … 31] ;  q ← t[32 … 63]
+  return ( p ⊕ q , p )                                  <span class="cm"># Δ′ = u_out ⊕ v_out = q</span>
+
+
+H⁻¹(u_out, v_out, hp) → (L, R):
+  p ← v_out ;  q ← u_out ⊕ v_out
+  z ← M⁻¹ · (p ‖ q)          <span class="cm"># M⁻¹[j][i] = C⁻¹[Ρ(j)][Π(i)] — бесплатно, §3.3</span>
+  z ← Несущая⁻¹(z, hp.weave, 64)
+  for c = 0 … 15:              <span class="cm"># стадия A обращается в два прохода</span>
+      R[c] = (a′[c])⁻¹ ⊗₁₆ ( v[c] ⊕ b′[c] ⊕ M₂ ⊗₁₆ u[c] )
+      L[c] = ( a[c] )⁻¹ ⊗₁₆ ( u[c] ⊕ b[c]  ⊕ M₁ ⊗₁₆ R[c] )
+  return (L, R)
+</div></div>
+<h3>8.1 Стадия A: ортоморфизм — с доказательством</h3><div class="card">
+<p>Стадия A работает на 32 чанках по 16 бит независимо (16 пар «L-чанк, R-чанк»), поэтому её
+свойства сводятся к свойствам одной пары. Линейная часть пары (L[c], R[c]) → (u[c], v[c]):</p>
+<div class="formula">u = a ⊗ L ⊕ M₁ ⊗ R
+v = M₂a ⊗ L ⊕ (a′ ⊕ M₂M₁) ⊗ R
+    ⎡ a      M₁        ⎤
+A = ⎣ M₂a    a′ ⊕ M₂M₁ ⎦      det A = a ⊗ a′ ⊕ M₁ ⊗ M₂ ⊗ a = <b>a ⊗ a′</b>
+
+A ⊕ id:
+    ⎡ a⊕1    M₁             ⎤
+    ⎣ M₂a    a′ ⊕ M₂M₁ ⊕ 1  ⎦   det(A ⊕ id) = (a⊕1) ⊗ (a′⊕1) ⊕ M₁ ⊗ M₂</div>
+<div class="ok"><b>Утверждение.</b> Стадия A пол-раунда является
+(i) биекцией 512-битного пространства ⇔ <code>a[c] ≠ 0</code> и <code>a′[c] ≠ 0</code> для всех c;
+(ii) <b>ортоморфизмом всей 512-битной XOR-группы</b> (то есть <code>x ↦ A(x) ⊕ x</code> — перестановка)
+⇔ дополнительно <code>(a[c]⊕1) ⊗ (a′[c]⊕1) ≠ M₁ ⊗ M₂</code> для всех c.
+Оба условия — про 2×2 матрицу над GF(2¹⁶): она обратима тогда и только тогда, когда её
+определитель ненулевой. Стадия A действует одинаково и независимо на всех 16 парах чанков,
+поэтому достаточно выполнить условие для каждой пары.</div>
+<p class="small">Обе формулы определителей сверены с прямым вычислением определителя 2×2 матрицы
+по Гауссу на <b>3000 случайных парах</b> (a, a′): расхождений 0 и 0 соответственно. Единственное
+запрещённое значение произведения <code>(a⊕1)(a′⊕1)</code> равно <code>M₁ ⊗ M₂ = 0x066F</code>; КУЗНИЦА
+<b>отбраковывает</b> a′, попадающие в него (ожидаемая частота 2⁻¹⁶, стоимость — одно лишнее чтение
+на 65536 пол-раундовых наборов).</p>
+<p class="small">Кросс-члены <code>M₁ ⊗ R</code> и <code>M₂ ⊗ u</code> — то, что отличает Kazual-512
+от канонического пол-раунда: каждая половина получает и собственный ортоморфизм, и вклад другой
+половины. M₁ и M₂ первообразны (порядок 65535), поэтому один бит входа расходится по всем 16 битам
+чанка. Треугольная структура (u входит в v) сохраняет обратимость без обращения матриц.</p>
+</div>
+<h3>8.2 Стадия C: Несущая</h3><div class="card">
+<p>Та же Несущая, что и в Предтакте F (§7.2), но на полном состоянии: 8 слов по 64 бита,
+4 фазы по <b>4 независимые пары</b> — то есть 4-дорожечный SIMD внутри пол-раунда. Роль стадии —
+внести <b>переносную нелинейность</b> туда, где иначе остались бы только линейные по XOR операции.
+Без неё пол-раунд был бы «XOR-линейным с точностью до F», и любой линейный аппарат, построенный
+поверх A и B, переносился бы через H без потерь.</p>
+<p class="small">Порядок A → C → B выбран не случайно: <b>последней</b> стоит XOR-линейная MDS.
+Только так утверждение «вес Δz = 1 ⇒ вес Δ′ = 32» (§8.3) остаётся строгим — стадии A и C суть
+биекции, они сохраняют ненулевую разницу, но не сохраняют её вес, а Веер уже доводит вес до
+максимума и делает это доказуемо.</p>
+</div>
+<h3>8.3 Стадия B: Веер и свойство Δ′</h3><div class="card">
+<p>Веер — динамическая Cauchy-MDS размера 64×64 над GF(2⁸), применённая ко всему состоянию
+пол-раунда. Выход устроен как «проекция и сумма»:</p>
+<div class="formula">t = M · z ;  p = t[0…31] ;  q = t[32…63] ;  H(z) = (p ⊕ q, p)
+
+следствия:
+  • стек [p; p⊕q] = [M_верх; M_низ] = M — значит H биективна тогда и только тогда,
+    когда M обратима, а Cauchy-MDS обратима всегда (§3.3);
+  • wt(t) ≥ 65 − wt(z)   — ветвевое число 65 при ЛЮБОМ ключе;
+  • <b>Δ′ = u_out ⊕ v_out = q = M_низ · z</b> — новая разница половин есть проекция
+    НИЖНЕЙ половины Веера.</div>
+<p>У матрицы Коши нет нулевых элементов (это обратные величины), поэтому ни один столбец
+<code>M_низ</code> не содержит нуля, и любая её 32×32 подматрица невырождена (это подматрица
+Cauchy-MDS). Отсюда два строгих следствия:</p>
+<ul class="clean small">
+<li><b>Δ′ ≠ 0 ⇔ Δz ≠ 0.</b> Разница половин не может «схлопнуться» в ноль: дыра №1 каркаса закрыта
+    не эвристически, а алгебраически.</li>
+<li><b>wt(Δz) = 1 ⇒ wt(Δ′) = 32 (полный вес).</b> Самый опасный для атакующего случай —
+    однобайтовая разница — автоматически превращается в полновесную разницу на входе следующего F.</li>
+</ul>
+<table class="tr"><thead><tr><th class="n">вес Δz</th>
+<th class="n">1</th>
+<th class="n">2</th>
+<th class="n">3</th>
+<th class="n">4</th>
+<th class="n">8</th>
+<th class="n">16</th>
+<th class="n">32</th>
+</tr></thead><tbody><tr><td class="n">min вес Δ′ (из 32)</td>
+<td class="n good">32</td>
+<td class="n good">31</td>
+<td class="n good">30</td>
+<td class="n good">30</td>
+<td class="n good">30</td>
+<td class="n good">30</td>
+<td class="n good">30</td>
+</tr></tbody></table>
+<p class="note">Измерено на фактических таблицах пол-раунда: 300 случайных различий каждого веса. Для веса 1 проверены <b>все 64 позиции</b> — результат 32/32 во всех случаях. Ветвевое число самого Веера измерено как <b>65</b> (теоретически 65). Практический смысл: разница, входящая в F, имеет вес 31 из 32 байт в минимуме и 31.9 в среднем по всем пяти раундам.</p>
+</div>
+<h3>8.4 Что даёт каждое слагаемое</h3>
+<table><thead><tr><th>элемент</th><th>зачем</th><th>цена</th></tr></thead><tbody>
+<tr><td><code>a ⊗ L ⊕ b</code>, <code>a′ ⊗ R ⊕ b′</code></td><td>ключевой ортоморфизм: ломает инвариантность разницы (дыра №1) и линейную предсказуемость σ (дыра №3)</td><td class="small">2 умножения в GF(2¹⁶) на чанк</td></tr>
+<tr><td><code>M₁ ⊗ R</code>, <code>M₂ ⊗ u</code></td><td>кросс-диффузия: каждая половина зависит от обеих (дыра №4). M₁, M₂ первообразны → один бит входа расходится по всем 16 битам чанка</td><td class="small">2 умножения на чанк</td></tr>
+<tr><td>треугольная структура (u входит в v)</td><td>обратимость без матричного обращения: A⁻¹ считается в два прохода</td><td class="small">0</td></tr>
+<tr><td>Несущая (16 ARX-подшагов)</td><td>переносная нелинейность и алгебраическая степень 63–64 на слово; ломает перенос линейных соотношений через H</td><td class="small">16 умножений mod 2⁶⁴ + 16 сложений + 32 поворота</td></tr>
+<tr><td>Веер (MDS 64×64)</td><td>полная диффузия за одну стадию: ветвевое число 65; строгое свойство Δ′ (§8.3)</td><td class="small">4096 умножений в GF(2⁸), 64 независимые строки</td></tr>
+<tr><td>выход <code>(p ⊕ q, p)</code> вместо <code>(p, q)</code></td><td>делает новую разницу половин проекцией нижней половины MDS — отсюда wt(Δz)=1 ⇒ wt(Δ′)=32</td><td class="small">32 XOR</td></tr>
+</tbody></table>
+<p class="note">Измерено в примере Kazual-64 (§13): различие в 1 бит на входе после H₀ даёт 37 бит
+различия из 64 — пол-раунд сам по себе рассевает один бит больше чем на половину блока. Это линейное
+рассеивание плюс переносы: нелинейность даёт только F, и H не пытается её подменять.</p>
+<h2 id="s9"><span class="num">§9</span>Расписание ключей: двутактная GFN Type-2</h2>
+<p class="lead">Расписание должно одновременно: (1) дать полную лавину по ключу за 1–2 раунда,
+(2) быть односторонним, (3) <b>не терять энтропию ключа</b>, (4) не иметь повторяющихся раундов.
+Пункты (2) и (3) противоречат друг другу напрямую: потеря информации уменьшает энтропию.
+Разрешение — разделить их по разным узлам: односторонность обеспечивает ГОРН на входе,
+сохранение энтропии — доказуемо биективная двутактная GFN после него.</p>
+<h3>9.1 Три стадии</h3><div class="card"><div class="formula">
+TAG = "Kazual-512"                            <span class="cm"># ASCII, без завершающего нуля</span>
+
+<span class="cm">═══ СТАДИЯ 0 — ГОРН: единственное место, где уместна сжимающая функция ═══</span>
+Z ← gorn_hash(K, TAG ‖ "/KS0")                  <span class="cm"># 512 бит = 64 байта</span>
+    <span class="cm"># даёт: полную лавину по ключу, односторонность, снятие слабых ключей</span>
+    <span class="cm"># измерено: однобитовое различие K меняет Z целиком (SAC 256.2 из 512)</span>
+
+<span class="cm">═══ СТАДИЯ 1 — ДВУТАКТНАЯ GFN Type-2, k = 8 ветвей по 64 бита, 32 раундов ═══</span>
+X ← Z
+Y ← ζ(Z) = M₆₄ · Z ⊕ INIT                        <span class="cm"># фиксированная биекция: базовая Cauchy-MDS 64×64</span>
+    <span class="cm"># INIT = ГОРН("", TAG‖"/KS-INIT/"‖имя_инстанции)[0:64];</span>
+    <span class="cm"># для Kazual-512 тег = "Kazual-512/KS-INIT/Kazual-512"</span>
+    <span class="cm"># (доменное разделение масштабированных инстанций §13)</span>
+for r = 0 … 31:
+    Θ_r ← TableGen(X, r)          <span class="cm"># САМОИЗМЕНЯЮЩИЕСЯ таблицы: π/ρ для MDS₆₄,</span>
+                                  <span class="cm"># φ и аффинные маски для 4 ветвевых F;</span>
+                                  <span class="cm"># материал = ГОРН-expand(X ‖ r₁₆be, TAG‖"/KS-TBL", 234 Б)</span>
+    X₁  ← GFN2(Y, Θ_r) ⊕ RC_r     <span class="cm"># Type-2 раунд над ВЕДОМЫМ регистром; биекция при Θ_r;</span>
+                                  <span class="cm"># RC_r = ГОРН-expand(r₃₂be, TAG‖"/KS-RC", 64) — константы,</span>
+                                  <span class="cm"># общие для всех ключей (не секретны)</span>
+    Y₁  ← X ⊕ X₁
+    (X, Y) ← (X₁, Y₁)             <span class="cm"># двутактный сдвиг — тоже биекция (§9.2)</span>
+    out_r ← X ‖ Y                 <span class="cm"># 1024 бита свежего материала</span>
+
+material ← out₀ ‖ out₁ ‖ … ‖ out₃₁               <span class="cm"># 32768 бит</span>
+
+<span class="cm">═══ СТАДИЯ 2 — детерминированная нарезка (порядок строгий!) ═══</span>
+    W_L , W_R          ← 2 × 256 бит     (забеливание входа)
+    W′_L, W′_R         ← 2 × 256 бит     (забеливание выхода)
+    for i = 0 … 5:     (параметры стадии A пол-раунда H_i)
+        a[c]  ← unit16 × 16 ;  b[c] ← 16 бит × 16
+        a′[c] ← unit16 × 16 с отбраковкой (a⊕1)(a′⊕1) = M₁M₂ ;  b′[c] ← 16 бит × 16
+    seedH_i ← 512 бит × 6        → forge(seedH_i, TAG‖"/FORGE-H") → Несущая + Веер H_i
+    seedF_i ← 512 бит × 5        → forge(seedF_i, TAG‖"/FORGE-F") → все таблицы F_i
+    остаток отбрасывается
+</div>
+<div class="formula">GFN2(Y, Θ):                                 <span class="cm"># один раунд Type-2, k = 8 ветвей по 8 байт</span>
+    br[j] ← Y[8j … 8j+7]                    <span class="cm"># 8 ветвей</span>
+    for j = 0 … 3:                          <span class="cm"># нелинейность на ЧЁТНЫХ ветвях (k/2), независимо</span>
+        y ← br[2j]
+        y[b] ← S<sub>φ[j][b]</sub>( A[j][b] ⊗ y[b] ⊕ B[j][b] )     <span class="cm"># необратимые APN S-box’ы</span>
+        y ← M₈ · y                                       <span class="cm"># Cauchy-MDS 8×8 внутри ветви</span>
+        br[2j+1] ← br[2j+1] ⊕ y
+    return M<sub>Π,Ρ</sub> · flatten(br)                           <span class="cm"># ПОЛНАЯ MDS 64×64, ветвевое число 65</span></div>
+</div>
+<h3>9.2 Почему двутактность: доказательство биективности</h3><div class="card">
+<p>Обычный Type-2 раунд сам по себе обратим даже с необратимой ветвевой функцией: чётная ветвь
+сохраняется в состоянии, поэтому <code>f(br[2j])</code> можно пересчитать и вычесть. Но если таблицы
+раунда брать из того же регистра, который этот раунд преобразует, обратимость теряется —
+и вместе с ней теряется энтропия ключа. Двутактность решает проблему в одну строку:</p>
+<div class="formula">прямой ход:    X₁ = G_X(Y) ;  Y₁ = X ⊕ X₁          <span class="cm"># G_X — Type-2 раунд с таблицами из X</span>
+обратный ход:  X  = Y₁ ⊕ X₁                        <span class="cm"># сначала восстанавливается ВЕДУЩИЙ регистр</span>
+               Y  = G_X⁻¹(X₁)                       <span class="cm"># таблицы теперь известны — ведомый тоже</span></div>
+<div class="ok"><b>Утверждение.</b> Отображение
+<code>(X, Y) ↦ (G_X(Y) ⊕ RC,  X ⊕ G_X(Y) ⊕ RC)</code> биективно, если G_X биективна по Y
+при каждом фиксированном X. Доказательство: обратный ход выше однозначен — X восстанавливается
+одним XOR из известного результата, после чего таблицы Θ = TableGen(X) становятся известны
+и G_X обращается. Осталось заметить, что G_X — это Type-2 раунд: чётные ветви проходят через него
+нетронутыми (ветвевая функция только <i>прибавляется</i> к нечётным), поэтому необратимость
+S-box’ов не мешает: G_X⁻¹ вычисляется пересчётом ветвевой функции вперёд. Значит
+<b>вся Стадия 1 — композиция биекций</b>, <code>Z ↦ material</code> инъективна, и все 512 бит
+ключа доходят до подключей без потерь.</div>
+<p class="small">Замечание о формулировке: необратимость ветвевых S-box’ов <b>не</b> делает
+расписание односторонним — в фейстелевской структуре вход ветвевой функции всегда остаётся
+доступным, поэтому «одностороннее расписание на необратимых S-box’ах» — распространённая ошибка рассуждения.
+Односторонность в Kazual-512 обеспечивается Стадией 0 (ГОРН — сжимающая функция 512→512 бит,
+стойкость к прообразу ≈ 2⁵¹²), а сохранение энтропии — Стадией 1. Эти два свойства разнесены
+по разным узлам и не мешают друг другу.</p>
+<div class="formula">Что даёт самоизменяемость таблиц:
+  • раунд r и раунд r′ не совпадают даже при одинаковом состоянии ветвей —
+    Θ_r зависит от X, который меняется каждый раунд ⇒ скользящие атаки на расписание не имеют опоры;
+  • related-key различие меняет не только данные, но и САМИ линейные оболочки расписания:
+    матрицы MDS у двух родственных ключей разные, поэтому «общая» related-key характеристика
+    строится сразу по двум разным наборам таблиц;
+  • цена: 140288 операций на ключ, один раз на срок жизни ключа.</div>
+</div>
+<h3>9.3 Бюджет ключевого материала</h3><div class="card">
+<table><thead><tr><th>статья</th><th class="n">сколько</th><th class="n">бит</th></tr></thead><tbody>
+<tr><td>Забеливание входа / выхода</td><td class="n mono">4 × 256 бит</td><td class="n mono">1024</td></tr>
+<tr><td>Параметры стадии A: 6 пол-раундов × (a, b, a′, b′ по 16 чанков × 16 бит + 256 бит запаса на отбраковку)</td><td class="n mono">6 × 160 байт</td><td class="n mono">7680</td></tr>
+<tr><td>Сиды КУЗНИЦЫ для H (Веер + Несущая)</td><td class="n mono">6 × 512 бит</td><td class="n mono">3072</td></tr>
+<tr><td>Сиды КУЗНИЦЫ для F (все таблицы)</td><td class="n mono">5 × 512 бит</td><td class="n mono">2560</td></tr>
+<tr class="hl"><td><b>Итого использовано</b></td><td class="n"></td><td class="n"><b>14336</b> = 1792 байт (совпадает с фактическим расходом в коде)</td></tr>
+<tr><td>Доступно (32 раундов × 1024)</td><td class="n"></td><td class="n">32768</td></tr>
+<tr><td>Запас (отбрасывается)</td><td class="n"></td><td class="n">18432 (56%)</td></tr>
+</tbody></table>
+<p class="note">Проверено в коде: <code>used = 1792 байт из 4096</code> — совпадает с суммой таблицы.
+Никакого «растягивания» ключа не происходит: каждый подключ берётся из собственного свежего выхода
+двутактной GFN, а не из повторного использования одного и того же материала. Запас стадии A
+(256 бит на пол-раунд) нужен потому, что отбраковка <code>unit16</code> расходует в среднем
+1.00003 слова на множитель; переполнение бюджета проверяется в коде явной проверкой (исключение — работает и под <code>python -O</code>, в отличие от assert).
+Отброшенные 56% — сознательный резерв: если какой-то участок нарезки окажется слабее,
+чем предполагалось, его можно перенести на свежий материал, не меняя расписания.</p>
+</div>
+<h3>9.4 Измеренные свойства расписания</h3><div class="card">
+<table><thead><tr><th>свойство</th><th class="n">результат</th><th>на чём держится</th></tr></thead><tbody>
+<tr><td>Лавина по ключу (related-key различие)</td><td class="n good">бит ключа 0 → 126/128 байт различаются уже в out₀; бит 137 → 128/128; бит 511 → 128/128</td><td class="small">ГОРН в Стадии 0 (SAC 256.2 из 512) + полная MDS 64×64 с ветвевым числом 65</td></tr>
+<tr><td>Минимальное различие по всем 32 выходам</td><td class="n good">126 байт из 128</td><td class="small">нет «слабого» раунда: материал расходится полностью до первого же выхода</td></tr>
+<tr><td>Полное различие достигается начиная с раунда</td><td class="n good">r = 1 (худший случай из трёх)</td><td class="small">ветвевое число 65 ⇒ DR = 1–2 раунда, как у любого Type-2 с полной MDS</td></tr>
+<tr><td>Сохранение энтропии ключа</td><td class="n good">2⁵¹² (инъективность)</td><td class="small">Стадия 1 — композиция биекций (§9.2); ГОРН сжимает 512→512 бит, потеря энтропии ≤ 1 бит (random-oracle оценка: образ случайного отображения ≈ (1−1/e)·2⁵¹²)</td></tr>
+<tr><td>Односторонность</td><td class="n good">прообраз ≈ 2⁵¹²</td><td class="small">ГОРН: ёмкость 512 бит, биективная внутренняя перестановка, 8 раундов</td></tr>
+<tr><td>Отсутствие симметрий (slide)</td><td class="n good">раунды не идентичны</td><td class="small">Θ_r зависит от X; RC_r различны; φ зависит от r и от состояния</td></tr>
+<tr><td>Стоимость</td><td class="n good">385 перестановок ГОРНа на ключ (+6 одноразовых на глобальные константы — итого 391) + GFN: ≈ 7·10⁶ операций; 0.47 с в оптимизированном эталоне на Python</td><td class="small">один раз на ключ; окупается после ≈ 810 блоков ≈ 50 КБ данных</td></tr>
+</tbody></table>
+<div class="warn"><b>Компромисс: key agility — средняя.</b> Подготовка ключа стоит
+0.47 с в оптимизированной эталонной реализации на Python и ≈ 7·10⁶ элементарных операций в пересчёте на C
+(385 перестановок ГОРНа на ключ по ~17.6K операций каждая + 140288 операций GFN; вместе
+с одноразовым выводом глобальных констант — 391 перестановка). Это примерно
+<b>810 блоков шифрования ≈ 50 КБ данных</b>. Любая реальная сессия шифрует мегабайты
+и гигабайты, поэтому на практике стоимость подготовки ключа — шум. Ограничение остаётся
+в трёх узких сценариях: (1) смена ключа на каждый пакет на скоростях 100+ Гбит/с;
+(2) ультра-ограниченное железо, где важна энергия; (3) конструкции, где быстрая смена ключа —
+смысл дизайна (PRINCE, MANTIS: два XOR). Для них определён сокращённый режим: 4 раунда Стадии 1
+и 4 раунда ГОРНа — цена: потеря запаса по related-key и ослабление односторонности, поэтому
+режим помечен как небезопасный и по умолчанию выключен.</div>
+</div>
+<h2 id="s10"><span class="num">§10</span>Алгоритм целиком</h2>
+<p class="note">Псевдокод намеренно однозначен: все индексы, порядки операций и размеры заданы явно.
+Обозначения: <code>⊗</code> — умножение в соответствующем поле, <code>⊕</code> — XOR,
+<code>+</code> и <code>·</code> — сложение и умножение по модулю 2ʷ, <code>rotl/rotr</code> — циклический
+поворот, <code>Mₙ(π,ρ)</code> — динамическая Cauchy-MDS n×n над GF(2⁸), <code>S₁/S₂/S₃</code> — таблицы §3.2.</p>
+<div class="card"><h4 style="margin-top:0">10.1 Константы</h4><div class="formula">
+TAG    = "Kazual-512"                        <span class="cm"># ASCII, без завершающего нуля</span>
+Π      = π₁₆[0…255] ‖ e₁₆[0…255]             <span class="cm"># пул «ничего-в-рукаве», 2048 бит (§3.4)</span>
+IV     = Π[0 … 15]                           <span class="cm"># тигель ГОРНа, 1024 бит</span>
+POLY8  = 0x11B,   GEN8  = 3                  <span class="cm"># GF(2⁸): 2 НЕ первообразно, порядок(2) = 51</span>
+POLY16 = 0x1100B, GEN16 = 2                  <span class="cm"># GF(2¹⁶)</span>
+M1 = 0x3423, M2 = 0x581D                     <span class="cm"># ГОРН("", TAG‖"/H-CROSS/0")[0:4] | 1; оба первообразны</span>
+M1M2 = 0x066F                            <span class="cm"># единственное запрещённое значение (a⊕1)(a′⊕1)</span>
+GORN_ROUNDS = 8, LANES = 16, RATE = 64      <span class="cm"># тигель 128 байт, ёмкость 512 бит</span>
+
+n   = 32   <span class="cm"># байт в половине блока</span>       nc  = 16   <span class="cm"># чанков GF(2¹⁶) в половине</span>
+r   = 5    <span class="cm"># раундов</span>                      Ls  = 3    <span class="cm"># тактов внутри F</span>
+fan = 64   <span class="cm"># размер Веера</span>                 W_H = 8, wb_H = 64, T_H = 4   <span class="cm"># Несущая в H</span>
+W_F = 4,   wb_F = 64, T_F = 4                <span class="cm"># Несущая в Предтакте</span>
+k_ks = 8, R_ks = 32, ks_bytes = 64           <span class="cm"># ветвей, раундов, байт в регистре расписания</span>
+</div>
+<h4>10.2 Каркас</h4><div class="formula">
+function Encrypt(K[64], P[64]) → C[64]:
+    km ← KeySchedule(K)
+    L ← P[0…31] ⊕ km.W_L ;  R ← P[32…63] ⊕ km.W_R            <span class="cm"># забеливание входа</span>
+    (L, R) ← H(L, R, km.ht[0])
+    for i = 0 … 4:
+        T ← F(L ⊕ R, km.ft[i])                                <span class="cm"># 256 бит, необратимо</span>
+        L ← L ⊕ T ;  R ← R ⊕ T                                <span class="cm"># один T в обе половины</span>
+        (L, R) ← H(L, R, km.ht[i+1])
+    L ← L ⊕ km.Wp_L ;  R ← R ⊕ km.Wp_R                        <span class="cm"># забеливание выхода</span>
+    return L ‖ R
+
+function Decrypt(K[64], C[64]) → P[64]:
+    km ← KeySchedule(K)
+    L ← C[0…31] ⊕ km.Wp_L ;  R ← C[32…63] ⊕ km.Wp_R
+    (L, R) ← Hinv(L, R, km.ht[5])
+    for i = 4 downto 0:
+        T ← F(L ⊕ R, km.ft[i])                                <span class="cm"># та же F, та же разница!</span>
+        L ← L ⊕ T ;  R ← R ⊕ T
+        (L, R) ← Hinv(L, R, km.ht[i])
+    return (L ⊕ km.W_L) ‖ (R ⊕ km.W_R)</div>
+<h4>10.3 Раундовая функция F</h4><div class="formula">
+function F(X[32], ft) → Y[32]:
+    <span class="cm">--- Предтакт ---</span>
+    W ← X как 8 слов по 32 бита
+    for j = 0 … 7:
+        W[j] ← (j чётное) ? FL(W[j], ft.k1[j], ft.k2[j], ft.s[j])
+                          : FLinv(W[j], ft.k1[j], ft.k2[j], ft.s[j])
+    X ← W как 32 байта
+    w ← X как 4 слова по 64 бита
+    w ← CarryWeave(w, ft.weave, 64)
+    X ← w как 32 байта
+    <span class="cm">--- три такта ---</span>
+    for ℓ = 0 … 2:
+        for i = 0 … 31:  X[i] ← ft.fused[ℓ][i][ X[i] ]        <span class="cm"># fused = S_φ(A⊗x ⊕ B)</span>
+        X ← MDS32(X, ft.pi[ℓ], ft.rho[ℓ])
+    <span class="cm">--- эпилог ---</span>
+    for i = 0 … 31:  X[i] ← ft.C[i] ⊗ X[i] ⊕ ft.D[i]
+    return X
+
+function MDSn(x[n], pi, rho) → y[n]:
+    for i = 0 … n−1:
+        y[i] ← ⊕<sub>j=0…n−1</sub>  INVN[ pi[i] ⊕ rho[j] ] ⊗ x[j]        <span class="cm"># INVN[t] = (n+t)⁻¹</span>
+    return y
+
+function MDSn_inv(y[n], pi, rho) → x[n]:                     <span class="cm"># для Веера, §3.3</span>
+    for j = 0 … n−1:
+        x[j] ← ⊕<sub>i=0…n−1</sub>  CINV[ rho[j] ][ pi[i] ] ⊗ y[i]        <span class="cm"># CINV — фиксированная</span>
+    return x</div>
+<h4>10.4 Пол-раунд H</h4><div class="formula">
+function H(L[32], R[32], hp) → (uo[32], vo[32]):
+    <span class="cm">--- A: ортоморфизм, 16 независимых чанков ---</span>
+    for c = 0 … 15:
+        Lc ← L[2c] ‖ L[2c+1] ;  Rc ← R[2c] ‖ R[2c+1]           <span class="cm"># big-endian чанки</span>
+        u[c] ← hp.a[c] ⊗₁₆ Lc ⊕ hp.b[c] ⊕ M₁ ⊗₁₆ Rc
+        v[c] ← hp.a2[c] ⊗₁₆ Rc ⊕ hp.b2[c] ⊕ M₂ ⊗₁₆ u[c]
+    z ← (u ‖ v) как 64 байта
+    <span class="cm">--- C: Несущая, 4 фазы по 4 независимые пары ---</span>
+    z ← CarryWeave(z как 8 слов × 64 бита, hp.weave, 64) как 64 байта
+    <span class="cm">--- B: Веер ---</span>
+    t ← MDS64(z, hp.PI, hp.RHO)
+    p ← t[0…31] ;  q ← t[32…63]
+    return (p ⊕ q, p)
+
+function Hinv(uo[32], vo[32], hp) → (L[32], R[32]):
+    p ← vo ;  q ← uo ⊕ vo
+    z ← MDS64_inv(p ‖ q, hp.PI, hp.RHO)
+    z ← CarryWeaveInv(z как 8 слов × 64 бита, hp.weave, 64) как 64 байта
+    for c = 0 … 15:
+        u[c] ← z[2c] ‖ z[2c+1] ;  v[c] ← z[32+2c] ‖ z[32+2c+1]
+        Rc ← (hp.a2[c])⁻¹ ⊗₁₆ ( v[c] ⊕ hp.b2[c] ⊕ M₂ ⊗₁₆ u[c] )
+        Lc ← (hp.a[c])⁻¹  ⊗₁₆ ( u[c] ⊕ hp.b[c]  ⊕ M₁ ⊗₁₆ Rc )
+        R[2c] ‖ R[2c+1] ← Rc ;  L[2c] ‖ L[2c+1] ← Lc
+    return (L, R)
+
+function CarryWeave(w[W], par, wb) → w[W]:
+    for t = 0 … T−1:
+        for (j, k) in Pairs(W, t):                             <span class="cm"># W/2 НЕЗАВИСИМЫХ пар</span>
+            x ← ( rotl(w[j], par.α[t]) + (w[k] · par.m[t]) mod 2ʷᵇ ) mod 2ʷᵇ
+            w[j] ← x
+            w[k] ← w[k] ⊕ x ⊕ par.c[t]
+    return w
+Pairs(W, t) = (t чётное) ? [(0,1),(2,3),…] : [(0,W−1),(2,1),(4,3),…]</div>
+<h4>10.5 ГОРН и КУЗНИЦА</h4><div class="formula">
+function gorn_perm(S[128]) → S[128]:
+    for r = 0 … 7:
+        for p = 0 … 127:  S[p] ← AFFA[r][p] ⊗ (S[p] ⊕ SIGB[r][p])⁻¹ ⊕ AFFC[r][p] ⊕ SIG[r][p]
+        for q = 0 … 7:    (S[q], S[8+q], …, S[120+q]) ← C₁₆ · (S[q], S[8+q], …, S[120+q])
+        for q = 0 … 7, i = 0 … 15:  S′[(i + 5q + r) mod 16, q] ← S[i, q]
+        for i = 0 … 15:
+            x ← S[i] как 64 бита
+            x ← (x · ODD[r][i]) mod 2⁶⁴ ;  x ← x ⊕ (x ≫ 29) ;  x ← rotl64(x, ROT[r][i])
+            S[i] ← (x + LCST[r][i]) mod 2⁶⁴
+    return S
+
+function gorn_hash(msg, tag) → 64 байта:
+    S ← IV
+    for B in pad(msg, tag, rate = 64):
+        S[0…63] ← S[0…63] ⊕ B ;  S ← gorn_perm(S)
+    return fold(gorn_perm(S))
+
+function fold(S) → 64 байта:
+    for i = 0 … 7:  out[i] ← S[i] ⊕ rotl64(S[i+8],17) ⊕ rotl64(S[(i+3) mod 8 + 8],41)
+                                          ⊕ rotl64(S[(2i+5) mod 8 + 8],53)
+
+function forge(seed[64], tag, N) → N байт:      <span class="cm"># режим расширения ГОРНа;</span>
+    <span class="cm"># фактические N: 744 Б (FORGE-F), 402 Б (FORGE-H), 234 Б (KS-TBL)</span>
+    S ← IV ; впитать (seed, tag) ; далее отжим: while |out| &lt; N: S ← gorn_perm(S); out ‖= fold(S)
+
+function KeySchedule(K[64]) → km:
+    Z ← gorn_hash(K, TAG ‖ "/KS0")
+    X ← Z ;  Y ← MDS64(Z, id, id) ⊕ gorn_hash("", TAG ‖ "/KS-INIT/" ‖ имя)[0…63]
+        <span class="cm"># имя инстанции: для Kazual-512 тег = "Kazual-512/KS-INIT/Kazual-512"</span>
+    RC[r] ← gorn_expand(r₃₂be, TAG ‖ "/KS-RC", 64)     <span class="cm"># общие константы, не секретны</span>
+    for r = 0 … 31:
+        Θ ← TableGen(X, r)                       <span class="cm"># forge(X ‖ r₁₆be, TAG‖"/KS-TBL", 234)</span>
+        X₁ ← GFN2(Y, Θ) ⊕ RC[r] ;  Y₁ ← X ⊕ X₁ ;  (X, Y) ← (X₁, Y₁) ;  out_r ← X ‖ Y
+    material ← out₀ ‖ … ‖ out₃₁
+    return Slice(material)                        <span class="cm"># §9.1, стадия 2</span>
+</div>
+<p class="note">Корректность дешифрования опирается на одно тождество:
+<code>(L ⊕ T) ⊕ (R ⊕ T) = L ⊕ R</code>. Поэтому Δ, из которой вычисляется T, восстанавливается
+после H⁻¹ без знания T — и обратимость F не требуется. Всё, что обязано быть обратимым, —
+это H: биективность стадий A, C и B проверена (§8) и подтверждена прогоном
+<code>Decrypt(K, Encrypt(K, P)) = P</code> на 20/20 случайных парах (K, P).</p>
+</div>
+<h2 id="s11"><span class="num">§11</span>Анализ стойкости</h2>
+<h3>11.1 Сводка по атакам</h3>
+<table><thead><tr><th>атака</th><th>оценка для Kazual-512</th><th>на чём держится</th><th>статус</th></tr></thead><tbody>
+<tr><td><b>Дифференциальная</b></td><td>доказуемо p ≤ 2⁻¹⁰²⁰ за 5 раундов; измерено p ≤ 2<sup>−2838</sup>. Порог осмысленности 2⁻²⁵⁶ → запас от 2⁷⁶⁴ до 2<sup>2582</sup></td><td class="small">≥34 активных S-box’ов на вызов F <b>при любом ключе</b> (ветвевое число 33 динамической Cauchy-MDS, аффинные маски сохраняют нули/ненули); δ ≤ 4. Измерено ≥93</td><td class="good small">доказано + измерено</td></tr>
+<tr><td><b>Линейная</b></td><td>корреляция ≤ 2⁻⁵¹⁰ на 5 раундов → данных нужно ~2¹⁰²⁰</td><td class="small">NL = 112 у всех трёх S-box’ов ⇒ |c| ≤ 2⁻³ на активный S-box; двойственная к Cauchy матрица тоже MDS ⇒ ветвевое число 33 и для линейных трейлов; аффинные маски не меняют max|W|</td><td class="good small">доказано</td></tr>
+<tr><td><b>Higher-order дифференциальная / интегральная</b></td><td>порядок ≥ 256 → данных ≥ 2²⁵⁶ = birthday bound</td><td class="small">смесь степеней 2 / 4 / 7 плюс переносы: измерено на микро-инстанции 4 → 14 из 16 за один такт → три такта; на модели Несущей степень 15 из 16 (§11.4)</td><td class="mid small">измерено на масштабных моделях</td></tr>
+<tr><td><b>Алгебраическая (XLS, линеаризация, Грёбнер)</b></td><td>неприменима: число мономов порядка 2⁶³ на слово</td><td class="small">три несовместимые алгебры; переносы mod 2⁶⁴ поднимают степень до 63–64 за одну фазу; ключезависимые маски добавляют неизвестные (§11.4)</td><td class="mid small">аргумент + измерение степени</td></tr>
+<tr><td><b>Невозможные дифференциалы / бумеранг</b></td><td>нет «свободных» раундов: минимум 93 активных S-box’ов на каждый вызов F</td><td class="small">2 раунда = ≥188 активных, 3 раунда = ≥283; «бумерангу» нужна короткая средняя часть с малой активностью — здесь любой кусок из двух раундов стоит 2<sup>−1128</sup></td><td class="good small">измерено</td></tr>
+<tr><td><b>Biclique</b></td><td>полный перебор 2⁵¹² не улучшается</td><td class="small">для биклики нужна «бесплатная» часть раундов; здесь каждый раунд содержит ≥93 активных S-box’ов, а таблицы ключезависимы, поэтому «полосы» биклики нельзя построить заранее (§11.6)</td><td class="mid small">аргумент</td></tr>
+<tr><td><b>Related-key</b></td><td>различие в 1 бит ключа даёт ≥126 различающихся байт из 128 уже в первом выходе расписания</td><td class="small">ГОРН в Стадии 0 (SAC 256.2/512) + полная MDS 64×64 с ветвевым числом 65 + самоизменяющиеся таблицы: у двух родственных ключей РАЗНЫЕ линейные оболочки (§11.5)</td><td class="good small">измерено</td></tr>
+<tr><td><b>Slide / скользящие</b></td><td>раунды не идентичны</td><td class="small">разные сиды КУЗНИЦЫ из разных выходов GFN; ключевые π, ρ, φ, маски, параметры Несущей и Заслонки; Θ_r в расписании зависит от X</td><td class="good small">конструктивно</td></tr>
+<tr><td><b>Слабые / эквивалентные ключи</b></td><td>классов не обнаружено; неподвижных точек 0 из 60</td><td class="small">ГОРН на входе расписания + отбраковка запрещённых значений (ровно равномерная); нулевой ключ даёт нетривиальный шифртекст (вектор 0 в §14)</td><td class="good small">измерено</td></tr>
+<tr><td><b>Инвариант разности (дыра №1 Лай–Мэсси)</b></td><td>закрыт алгебраически</td><td class="small">Δ′ = M<sub>низ</sub>·z, у M<sub>низ</sub> нет нулей ⇒ Δ′ = 0 ⇔ Δ = 0; wt(Δz)=1 ⇒ wt(Δ′)=32 (§8.3)</td><td class="good small">доказано</td></tr>
+<tr><td><b>Side-channel (кэш-атаки по времени)</b></td><td>уязвим в наивной табличной реализации</td><td class="small">индекс в таблицу S-box’а зависит от данные ⊕ ключ — та же проблема, что у AES без аппаратного ускорения. Митигация: bitslice (§12.3) или маскирование; динамические таблицы при этом <b>не</b> раскрываются в память (§12.4)</td><td class="warn small">частично</td></tr>
+<tr><td><b>Потолок стойкости (два разных)</b></td><td>восстановление ключа 2⁵¹²; неотличимость 2²⁵⁶</td><td class="small">свойство любого блочного шифра с блоком n бит: у случайной функции коллизии после ≈2^(n/2) запросов. Заявляемый уровень = min = 256 бит (§11.8)</td><td class="mid small">по определению</td></tr>
+</tbody></table>
+<h3>11.2 Что доказано, а не измерено</h3><div class="card">
+<ol class="small">
+<li><b>Динамическая Cauchy-MDS есть MDS при любом ключе.</b> Координаты <code>x_i = π(i) ∈ [0,n)</code>
+и <code>y_j = n + ρ(j) ∈ [n,2n)</code> попарно различны, <code>x_i ⊕ y_j ∈ [n,2n)</code> ≠ 0 ⇒ по формуле
+определителя Коши любая квадратная подматрица невырождена ⇒ ветвевое число n+1.</li>
+<li><b>M⁻¹ = P<sub>ρ</sub>⁻¹ C⁻¹ P<sub>π</sub>⁻¹.</b> Обратная матрица — фиксированная C⁻¹ с
+переставленными индексами: ни обращения матриц на ключ, ни второй копии памяти.</li>
+<li><b>Множество значений динамической MDS не зависит от ключа</b> — это <code>{(n+t)⁻¹ : t &lt; n}</code>.</li>
+<li><b>Аффинные маски сохраняют δ и NL точно</b> (аффинная эквивалентность) и сохраняют
+«ноль/не-ноль» (A ≠ 0), поэтому не меняют счёт активных S-box’ов.</li>
+<li><b>φ — перестановка фиксированного мультимножества</b> ⇒ числа позиций с δ = 2 и δ = 4
+и граница образа F одинаковы для всех ключей.</li>
+<li><b>act₁ + act₂ + act₃ ≥ 34</b> для любого вызова F при любом ключе; отсюда p ≤ (2⁻⁶)³⁴ = 2⁻²⁰⁴.</li>
+<li><b>Стадия A — биекция ⇔ a, a′ ≠ 0; ортоморфизм ⇔ (a⊕1)(a′⊕1) ≠ M₁M₂.</b>
+det A = a·a′, det(A⊕id) = (a⊕1)(a′⊕1) ⊕ M₁M₂ — обе формулы сверены с прямым вычислением
+определителя на 3000 парах.</li>
+<li><b>H — биекция</b> (композиция биекций A, C, B), и <b>Δ′ = M<sub>низ</sub>·z</b>, где у
+M<sub>низ</sub> нет нулевых элементов и все 32×32 подматрицы невырождены ⇒ Δ′ ≠ 0 ⇔ Δz ≠ 0 и
+wt(Δz) = 1 ⇒ wt(Δ′) = n.</li>
+<li><b>Несущая и Заслонка биективны при любых параметрах</b> (треугольность подшага; для Заслонки
+k₁, k₂ могут быть любыми).</li>
+<li><b>Стадия 1 расписания — композиция биекций</b> ⇒ <code>Z ↦ material</code> инъективна ⇒
+энтропия ключа не теряется (§9.2).</li>
+<li><b>Внутренняя перестановка ГОРНа биективна</b> (все четыре стадии обратимы), ранг свёртки
+ровно 512 ⇒ губка корректна.</li>
+<li><b>Генерация КУЗНИЦЫ ровно равномерна:</b> код Лемера (смещение ≤ 2⁻⁹⁶), отбраковка
+(смещение 0), x|1 (смещение 0).</li>
+</ol>
+</div>
+<h3>11.3 Что проверено запуском</h3><div class="card">
+<table class="tr"><thead><tr><th>проверка</th><th class="n">объём</th><th class="n">результат</th></tr></thead><tbody>
+<tr><td>биективность полного шифра, <code>dec∘enc = id</code></td><td class="n small">20 случайных (K, P)</td><td class="n good small">20/20</td></tr>
+<tr><td>лавина полного шифра (случайные пары)</td><td class="n small">150 пар</td><td class="n good small">254.8 бит из 512 (идеал 256), разброс 226…280</td></tr>
+<tr><td>строгий лавинный критерий по тексту</td><td class="n small">все 512 однобитовых различий</td><td class="n good small">256.1, разброс 224…303</td></tr>
+<tr><td>строгий лавинный критерий по ключу</td><td class="n small">64 однобитовых различия ключа</td><td class="n good small">253.2, разброс 225…278</td></tr>
+<tr><td>вес Δ, входящей в F</td><td class="n small">10 пар × 5 раундов</td><td class="n good small">min [31, 31, 31, 31, 31] из 32, среднее [31.9, 31.8, 31.9, 31.9, 31.9]</td></tr>
+<tr><td>неподвижные точки</td><td class="n small">60 случайных (K, P)</td><td class="n good small">0</td></tr>
+<tr><td>δ, NL, max|W|, степень, размер образа S-box’ов</td><td class="n small">полный перебор 256×256 и 255×256×256</td><td class="n good small">δ = 2/2/4, NL = 112/112/112, deg = 2/4/7, |img| = 86/86/256</td></tr>
+<tr><td>MDS-свойство базовых матриц</td><td class="n small">подматрицы до 3×3 перебором (n ≤ 8), до 2×2 (n ≥ 16) + случайные крупные</td><td class="n good small">MDS для n = 2, 4, 8, 16, 32, 64</td></tr>
+<tr><td>ветвевое число базовых матриц</td><td class="n small">1200–1500 случайных векторов + все веса 1–2</td><td class="n good small">n+1 для всех шести размеров</td></tr>
+<tr><td>динамическая Cauchy-MDS</td><td class="n small">9 случайных (π, ρ) для n = 8/32/64</td><td class="n good small">MDS, BN = n+1, M·M⁻¹ = I, нулей нет</td></tr>
+<tr><td>число различных значений динамической MDS</td><td class="n small">4 набора (π, ρ) на размер</td><td class="n good small">ровно n — от ключа не зависит</td></tr>
+<tr><td>ортоморфизм стадии A</td><td class="n small">3000 пар (a, a′)</td><td class="n good small">обе формулы определителя сошлись; расхождений 0</td></tr>
+<tr><td>биективность Несущей</td><td class="n small">6 конфигураций (W, wb, T), 600 прогонов</td><td class="n good small">обратный ход возвращает исходное</td></tr>
+<tr><td>биективность Заслонки</td><td class="n small">200 прогонов</td><td class="n good small">обратный ход возвращает исходное</td></tr>
+<tr><td>диффузия Несущей</td><td class="n small">1 перевёрнутый бит, 8 слов × 64 бита</td><td class="n good small">4 фазы → 8/8 слов, ~260 бит из 512</td></tr>
+<tr><td>алгебраическая степень модели Несущей</td><td class="n small">полный перебор 2¹⁶ + ANF</td><td class="n good small">15 из 16 (сложение 8, умножение 9, XOR 1)</td></tr>
+<tr><td>алгебраическая степень микро-F</td><td class="n small">полный перебор 2¹⁶ + ANF</td><td class="n good small">1 такт → 4, 3 такта → 14 из 16</td></tr>
+<tr><td>образ микро-F</td><td class="n small">полный перебор всех 65536 входов</td><td class="n good small">3602 = 2<sup>11.81</sup></td></tr>
+<tr><td>активные S-box’ы в F (вес 1)</td><td class="n small">полный перебор 32×255 = 8160</td><td class="n good small">min 82</td></tr>
+<tr><td>активные S-box’ы в полном шифре</td><td class="n small">750 трейлов на 3 ключах</td><td class="n good small">1 раунд 93, 2 188, 3 283, 4 377, 5 473</td></tr>
+<tr><td>свойство Веера «вес 1 → полный»</td><td class="n small">все 64 единичные позиции</td><td class="n good small">32/32 во всех случаях</td></tr>
+<tr><td>минимальный вес Δ′ при весе Δz = 1…32</td><td class="n small">300 различий каждого веса</td><td class="n good small">wt 1 → 32, wt 2 → 31, wt 3 → 30, wt 4 → 30, wt 8 → 30, wt 16 → 30, wt 32 → 30</td></tr>
+<tr><td>ветвевое число Веера</td><td class="n small">400 случайных малых весов</td><td class="n good small">65 (= 65)</td></tr>
+<tr><td>ГОРН: биективность перестановки</td><td class="n small">40 тиглей, явный обратный ход</td><td class="n good small">совпало</td></tr>
+<tr><td>ГОРН: лавина / SAC</td><td class="n small">150 пар / все 512 входов</td><td class="n good small">256.0 / 256.2 из 512</td></tr>
+<tr><td>ГОРН: ранг свёртки</td><td class="n small">Гаусс по 1024 входам</td><td class="n good small">512 из 512</td></tr>
+<tr><td>ГОРН: коллизии</td><td class="n small">3000 случайных входов</td><td class="n good small">0</td></tr>
+<tr><td>диффузия расписания ключей</td><td class="n small">3 однобитовых различия ключа</td><td class="n good small">≥126 байт из 128 во всех 32 выходах</td></tr>
+</tbody></table>
+<p class="note">Всё перечисленное воспроизводится одним запуском <code>kazual/results.py</code> (~3.5 мин на двух ядрах); результаты складываются в <code>kazual/results.json</code>, из которого собран этот документ. Однофайловая эталонная реализация (<code>kazual-512.py --selftest</code>, ~15 с) воспроизводит ключевое подмножество: порядки образующих, биективность и ранг свёртки ГОРНа, SAC, коллизии, δ/NL/степень/образ всех трёх S-box’ов, точные константы (9B 33 E2 3D ED C1; M₁ = 3423, M₂ = 581D, M₁M₂ = 066F), ветвевые числа и динамическую MDS, равномерность КУЗНИЦЫ, биективности Несущей и Заслонки, формулы определителей стадии A, образ микро-F = 3602, свойство Веера wt(Δz)=1 ⇒ wt(Δ′)=32, dec∘enc, SAC полного шифра, неподвижные точки, диффузию расписания, бюджет материала (ровно 1792 из 4096 байт у Kazual-512 и 200 из 256 у Kazual-64), число перестановок ГОРНа на ключ (385) и идентичность пакетного пути одиночному.</p>
+</div>
+<h3>11.4 Алгебраические атаки: почему они здесь не работают</h3><div class="card">
+<p>APN-функции низкой степени (x³ — степень 2, x⁵⁷ — степень 4) сами по себе удобны для
+линеаризации. Защита построена не на них, а на трёх вещах сразу.</p>
+<table class="tr"><thead><tr><th>источник степени</th><th class="n">степень</th><th>измерено на</th></tr></thead><tbody>
+<tr><td>S₃ = A₃(x²⁵⁴) — инверсия в GF(2⁸)</td><td class="n">7</td><td>полный перебор ANF, 255 компонентных функций</td></tr>
+<tr><td>один такт F-микро (маска → S → MDS)</td><td class="n">4 из 16</td><td>полный перебор 2¹⁶</td></tr>
+<tr><td>три такта F-микро</td><td class="n">14 из 16</td><td>полный перебор 2¹⁶</td></tr>
+<tr><td>Несущая, 3 фазы (модель wb = 8)</td><td class="n">15 из 16</td><td>полный перебор 2¹⁶</td></tr>
+<tr><td>только <code>a + b</code> (модель wb = 8)</td><td class="n">8</td><td>полный перебор 2¹⁶</td></tr>
+<tr><td>только <code>a · b</code> (модель wb = 8)</td><td class="n">9</td><td>полный перебор 2¹⁶</td></tr>
+<tr><td>только <code>a ⊕ b</code></td><td class="n">1</td><td>полный перебор 2¹⁶</td></tr>
+</tbody></table>
+<div class="formula">Экстраполяция на полный F (256 бит входа):
+  степень после такта ℓ  ≤  min( 256, 7^ℓ )      → 7, 49, 256 (насыщение на третьем такте)
+  Несущая в Предтакте    →  степень 63–64 на каждое 64-битное слово УЖЕ до первого S-слоя
+  ⇒ после одного раунда степень по битам открытого текста максимальна (256 в половине блока)
+
+Что это значит для атак:
+  • линеаризация / XLS: число мономов степени ≤ d от 512 переменных ~ C(512, d);
+    при насыщенной степени нужно d = 512 ⇒ система не линеаризуется ни при каком числе уравнений;
+  • fast algebraic attacks: требуют низкую степень произведения — здесь степень насыщается за один раунд;
+  • higher-order дифференциалы: порядок обнуления ≥ 256 ⇒ нужно ≥ 2²⁵⁶ подобранных текстов,
+    то есть не меньше birthday bound.</div>
+<p class="small">Дополнительно: ключезависимые аффинные маски и Заслонка вводят ключ <b>не только
+через XOR</b>, поэтому неизвестных в системе становится больше, а степень по ключевым битам
+растёт вместе со степенью по текстовым. И главное — сама система уравнений разная для разных
+ключей, потому что φ, π, ρ и маски входят в коэффициенты.</p>
+<div class="warn" style="margin-bottom:0"><b>Статус.</b> Это аргумент от степени и от числа мономов,
+подкреплённый измерением на масштабных моделях. Формального доказательства нестойкости XLS
+для данной конкретной системы нет — как нет его и для любой конструкции со смешанной алгеброй.</div>
+</div>
+<h3>11.5 Related-key: почему запаса больше, чем в линейной модели</h3><div class="card">
+<p>Классическая related-key оценка считаетTrail по расписанию как по линейной схеме с фиксированными
+таблицами. В Kazual-512 это не так: таблицы раунда расписания <code>Θ_r</code> вырабатываются из
+ведущего регистра <code>X</code>, поэтому различие ключей меняет <b>сами линейные оболочки</b>.</p>
+<div class="formula">Пусть K и K* различаются в одном бите.
+  1. Z = ГОРН(K) и Z* = ГОРН(K*) различаются в ~256 битах из 512 (SAC 256.2) — уже на входе GFN
+     нет «одного активного байта», с которого можно было бы строить трейл.
+  2. X₀ = Z и X₀* = Z* ⇒ Θ₀ и Θ₀* различны ⇒ матрицы MDS₆₄ у двух ключей РАЗНЫЕ.
+     Общая related-key характеристика должна быть одновременно трейлом для двух разных
+     линейных систем — вероятность перемножается.
+  3. Линейная часть: полная MDS 64×64 с ветвевым числом 65 ⇒ любое ненулевое различие активирует
+     ≥ 65 байт за два раунда ⇒ p ≤ (2⁻⁷)^65 = 2⁻⁴⁵⁵ (оценка СВЕРХУ, без учёта пункта 2).
+  4. Измерено: ≥ 126 байт из 128 различаются в КАЖДОМ из 32 выходов расписания.</div>
+<p class="small">Пункт 2 — содержательное усиление: он означает, что стандартная related-key
+модель (одна и та же функция раунда для всех ключей) к этому расписанию неприменима, и любая
+related-key атака обязана либо восстановить различие Θ (что стоит как минимум восстановления
+X, то есть полного ключа), либо работать с двумя несвязанными линейными системами.</p>
+</div>
+<h3>11.6 Biclique и невозможные дифференциалы</h3><div class="card">
+<p>Биклика (Biryukov–Khovratovich–Nikolić) улучшает полный перебор на 2–4 бита за счёт
+«бесплатной» средней части: часть раундов проходится без увеличения числа активных S-box’ов.
+Условие её применимости — наличие раундов с малой активностью, через которые можно провести
+две семейства трейлов.</p>
+<table class="tr"><thead><tr><th>фрагмент</th><th class="n">min активных S-box’ов (измерено)</th><th class="n">p ≤ (2⁻⁶)^act</th></tr></thead><tbody>
+<tr><td>1 раунд(а)</td><td class="n good">93</td><td class="n">2<sup>−558</sup></td></tr>
+<tr><td>2 раунд(а)</td><td class="n good">188</td><td class="n">2<sup>−1128</sup></td></tr>
+<tr><td>3 раунд(а)</td><td class="n good">283</td><td class="n">2<sup>−1698</sup></td></tr>
+<tr><td>4 раунд(а)</td><td class="n good">377</td><td class="n">2<sup>−2262</sup></td></tr>
+<tr><td>5 раунд(а)</td><td class="n good">473</td><td class="n">2<sup>−2838</sup></td></tr>
+</tbody></table>
+<p class="small">750 трейлов, 3 независимых ключа, различия весом 1–8 байт; худший найденный
+5-раундовый трейл — <code>[94, 94, 95, 94, 96]</code> активных по раундам. «Бесплатных» раундов нет: минимум на один
+раунд (93 активных) уже даёт 2<sup>−558</sup>, а на два — 2<sup>−1128</sup>. Чтобы биклика дала выигрыш, ей нужно
+разрезать шифр на части стоимостью не больше перебора; здесь стоимость любого разреза
+на порядки выше 2⁵¹² ÷ 2⁴.</p>
+<p class="small"><b>Невозможные дифференциалы.</b> Конструкция опирается на существование
+короткого невозможного дифференциала (обычно 3–4 раунда с вероятностью 0). Здесь любой
+3-раундовый фрагмент содержит ≥283 активных S-box’ов, то есть его вероятность ≤ 2<sup>−1698</sup>, а не 0 —
+и при этом «нулевых» переходов, на которых строятся невозможные дифференциалы,
+систематически не возникает: APN-подстановки с δ = 2 имеют ровно 2 прообраза на каждую достижимую
+пару (Δ_in, Δ_out), а 10 позиций на такт заняты биективным S₃.</p>
+</div>
+<h3>11.7 Side-channel</h3><div class="card">
+<p>Честно: наивная табличная реализация уязвима к кэш-атакам по времени ровно так же, как AES
+без аппаратного ускорения — индекс в 256-байтовую таблицу зависит от «данные ⊕ ключ». Что в
+конструкции помогает, а что нет:</p>
+<table class="tr"><thead><tr><th>фактор</th><th>влияние</th></tr></thead><tbody>
+<tr><td>Статические таблицы — только 3 S-box’а, 768 байт</td>
+    <td class="good">12 кэш-линий по 64 Б: весь S-слой помещается в L1, и набор обращаемых линий
+        <b>не зависит от ключа</b></td></tr>
+<tr><td>Динамическая MDS хранится как n² <b>байт-индексов</b>, а значения берутся из фиксированных
+        n таблиц умножения</td>
+    <td class="good">таблицы умножения общие для всех ключей; ключезависимы только индексы,
+        которые читаются последовательно и не зависят от данных</td></tr>
+<tr><td>Несущая и Заслонка — чистая арифметика (×, +, rotl, &, |, ⊕)</td>
+    <td class="good">без таблиц вообще, постоянное время на любой платформе с неизменяемым временем
+        умножения 64×64</td></tr>
+<tr><td>Стадия A — умножение в GF(2¹⁶)</td>
+    <td class="mid">log/alog-таблицы 256 КБ уязвимы; на CLMUL (pclmulqdq + приведение) таблиц нет вовсе</td></tr>
+<tr><td>Динамические таблицы в памяти</td>
+    <td class="mid">223 КБ на ключ в табличной реализации — их надо стирать и не подменять;
+        в bitslice-реализации не материализуются. Развёрнутые таблицы эталонной
+        Python-реализации (~29 МБ на ключ) надёжно стереть средствами Python нельзя
+        в принципе (неизменяемые объекты, копии при сборке мусора) — ещё одна причина,
+        по которой эталон — инструмент проверки спецификации, а не продакшн</td></tr>
+<tr><td>Порядок обращений к S-таблицам</td>
+    <td class="bad">зависит от данных — классический канал; лечится только bitslice или маскированием</td></tr>
+</tbody></table>
+<div class="formula">Bitslice-стоимость (измерено перебором ANF):
+                       мономов степени ≥2    AND-гейтов (с общими подтермами)
+   S₁ = A₁(x³)    :           114                       28
+   S₂ = A₂(x⁵⁷)   :           634                      154
+   S₃ = A₃(x²⁵⁴)  :           976                      246   (инверсия, как в AES)
+
+Динамическая аффинная маска A⊗x ⊕ B добавляет к каждому S-box’у ≤ 8 XOR на входе и ≤ 8 XOR
+на выходе: умножение на КОНСТАНТУ в GF(2⁸) — чисто линейная схема, AND-гейтов не добавляет вовсе.
+Удорожание bitslice-такта — единицы процентов.</div>
+<p class="small" style="margin-bottom:0"><b>Маскирование не описано</b> — это отдельная работа.
+Отмечу только, что маска дешевле всего ложится на S₁: 28 AND-гейтов против 246 у инверсной
+подстановки, поэтому маскировать две трети позиций такта заметно дешевле, чем в AES-подобной
+схеме; 22 позиции из 32 в каждом такте заняты именно APN-подстановками.</p>
+</div>
+<h3>11.8 Два потолка стойкости — их нельзя смешивать</h3><div class="card">
+<p>Восстановление ключа стоит <b>2⁵¹²</b> (перебор; расписание инъективно, §9.2, поэтому
+эффективное пространство ключей не меньше 2⁵¹¹·³ даже с учётом сжатия ГОРНом).
+Неотличимость от случайной перестановки ограничена размером блока: <b>2²⁵⁶</b> (birthday bound).
+Заявляемый уровень шифра принято брать по минимуму — <b>256 бит</b>.</p>
+<p>Важно, что это не слабость: столько же приписывают AES-256, чей потолок неотличимости и вовсе
+2⁶⁴. Практический смысл большого блока обратный — лимит данных на один ключ: у Kazual-512 это
+~2²⁵⁶ блоков (2²⁵⁹ байт), тогда как отраслевые ограничения для AES в GCM — 2³² блоков (256 ГБ)
+на ключ. 512-битный ключ при этом не «лишний»: он поднимает перебор до 2⁵¹², даёт запас
+в related-key модели (§11.5) и питает КУЗНИЦУ — на 6928 байт динамических таблиц расходуется
+11 свежих сидов по 512 бит (5 для F, 6 для H), каждый из собственного выхода расписания.</p>
+<p class="small" style="margin-bottom:0"><b>Почему разделитель не превращается в атаку на ключ.</b>
+Разделитель на 2²⁵⁶ запросов отличает шифр от случайной перестановки, но сам по себе не даёт ключа:
+чтобы превратить его в атаку, нужно связать наблюдение с ключом, а все структуры, через которые
+это можно было бы сделать (линейный слой, назначение S-box’ов, аффинные маски), у каждого ключа
+свои. Формально это не доказано (§15.3), но конструктивно «бесплатного» прохода от разделителя
+к ключу в схеме нет.</p>
+</div>
+<h2 id="s12"><span class="num">§12</span>Скорость и параллелизм</h2>
+<h3>12.1 Что параллелится, а что нет</h3>
+<table><thead><tr><th>узел</th><th class="n">дорожек</th><th>тип параллелизма</th><th>почему</th></tr></thead><tbody>
+<tr><td>Σ-слой ГОРНа</td><td class="n">128</td><td class="small">SIMD внутри перестановки</td><td class="small">128 независимых 256-байтовых таблиц</td></tr>
+<tr><td>Μ-микшер ГОРНа</td><td class="n">8</td><td class="small">SIMD</td><td class="small">8 колонок считаются независимо; внутри колонки — 16 строк</td></tr>
+<tr><td>Α-лейны ГОРНа</td><td class="n">16</td><td class="small">SIMD</td><td class="small">16 слов по 64 бита, нет межлейновых зависимостей</td></tr>
+<tr><td>Заслонка (в F)</td><td class="n">8</td><td class="small">SIMD</td><td class="small">8 слов по 32 бита обрабатываются независимо</td></tr>
+<tr><td>Несущая (в F)</td><td class="n">2</td><td class="small">SIMD</td><td class="small">пары в фазе не пересекаются; между фазами — только смена спаривания</td></tr>
+<tr><td>S-слой такта</td><td class="n">32</td><td class="small">SIMD</td><td class="small">32 независимых подстановки; 256 бит = ровно один регистр AVX-512 или половина AVX2</td></tr>
+<tr><td>MDS 32×32 (такт)</td><td class="n">32</td><td class="small">SIMD</td><td class="small">32 строки независимы; значений всего 32 → 32 таблицы по 256 Б (8 КБ)</td></tr>
+<tr><td>Стадия A пол-раунда</td><td class="n">16</td><td class="small">SIMD</td><td class="small">16 чанков GF(2¹⁶) независимы</td></tr>
+<tr><td>Несущая (в H)</td><td class="n">4</td><td class="small">SIMD</td><td class="small">4 независимые пары на фазу</td></tr>
+<tr><td>Веер MDS 64×64</td><td class="n">64</td><td class="small">SIMD</td><td class="small">64 независимые строки; значений 64 → 64 таблицы (16 КБ)</td></tr>
+<tr><td>Расписание: ветви GFN</td><td class="n">4</td><td class="small">SIMD</td><td class="small">4 нелинейных ветви на раунд независимы</td></tr>
+<tr><td>Расписание: MDS 64×64</td><td class="n">64</td><td class="small">SIMD</td><td class="small">64 независимые строки</td></tr>
+<tr><td>Блоки между собой (CTR / ECB / GCM-шифрование)</td><td class="n">∞</td><td class="small">межъядерный, GPU</td><td class="small">«embarrassingly parallel»: любое число ядер без изменения алгоритма; в CBC-расшифровании — тоже</td></tr>
+<tr><td>5 раундов внутри блока</td><td class="n">1</td><td class="small"><span class="bad">нет</span></td><td class="small">строго последовательно: 5 × (Предтакт + 3 такта) + 6 пол-раундов в глубину. Ограничивает latency, но не throughput</td></tr>
+<tr><td>Несущая внутри фазы</td><td class="n">1</td><td class="small"><span class="bad">нет</span></td><td class="small">цепочка «умножение → сложение → XOR» длиной 4 фазы; это цена переносной нелинейности</td></tr>
+<tr><td>CBC-шифрование</td><td class="n">1</td><td class="small"><span class="bad">нет</span></td><td class="small">свойство режима, а не шифра</td></tr>
+</tbody></table>
+<div class="ok"><b>Итог.</b> Пропускная способность параллелится на четырёх уровнях сразу:
+дорожки внутри стадии (до 128), стадии внутри раунда, раунды в конвейере, блоки между ядрами.
+Не параллелится только глубина одного блока — ровно как у любого блочного шифра. Поэтому
+Kazual-512 хорош там, где много независимых данных (хранилища, магистральные каналы, CTR/GCM,
+дисковое шифрование), и плох там, где критична задержка одного короткого сообщения.
+Эталонная реализация реализует межблочный уровень через <code>encrypt_blocks /
+decrypt_blocks</code>: NumPy (CPU-векторизация по блокам), CuPy (GPU) и multiprocessing
+по ядрам; результат побитово идентичен одиночному пути (проверяется самопроверкой).</div>
+<h3>12.2 Оценка стоимости</h3><div class="card">
+<table><thead><tr><th>узел</th><th class="n">операций на блок</th><th>что внутри</th></tr></thead><tbody>
+<tr><td>Заслонка × 5</td><td class="n mono">320</td><td class="small">8 слов × (2 ключевых побитовых + поворот + 2 XOR)</td></tr>
+<tr><td>Несущая в Предтакте × 5</td><td class="n mono">240</td><td class="small">4 фазы × 2 пары × (умножение mod 2⁶⁴ + сложение + 2 поворота + XOR)</td></tr>
+<tr><td>S-слой × 15</td><td class="n mono">480</td><td class="small">15 тактов × 32 обращения к 256-байтовым таблицам (в табличной реализации маска слита с S-box’ом)</td></tr>
+<tr><td>MDS 32×32 × 15</td><td class="n mono">15,360</td><td class="small">15 × 1024 обращения к 32 фиксированным таблицам умножения + XOR</td></tr>
+<tr><td>эпилог F × 5</td><td class="n mono">160</td><td class="small">32 аффинных преобразования</td></tr>
+<tr><td>стадия A × 6</td><td class="n mono">1,152</td><td class="small">6 × (16 пар чанков × 4 умножения в GF(2¹⁶) × 3 оп/умножение) (log/alog или CLMUL)</td></tr>
+<tr><td>Несущая в H × 6</td><td class="n mono">576</td><td class="small">6 × (4 фазы × 4 пары × 6 операций)</td></tr>
+<tr><td>Веер MDS 64×64 × 6</td><td class="n mono">24,576</td><td class="small">6 × 4096 обращений к 64 фиксированным таблицам умножения + XOR</td></tr>
+<tr class="hl"><td><b>Итого на блок 64 байта</b></td><td class="n mono"><b>42,864</b></td><td class="small"><b>670 элементарных операций на байт</b> — верхняя граница для неоптимизированного кода</td></tr>
+<tr><td>Расписание ключей (GFN, без КУЗНИЦЫ)</td><td class="n mono">140,288</td><td class="small">32 раунда × (4 ветвевых F + полная MDS 64×64)</td></tr>
+<tr><td>Расписание ключей (всего, с ГОРНом и КУЗНИЦЕЙ)</td><td class="n mono">≈ 7·10⁶</td><td class="small">385 перестановок ГОРНа на ключ (391 с одноразовым выводом глобальных констант) × ~17.6K операций + 140,288 операций GFN + код Лемера</td></tr>
+</tbody></table>
+<p class="note">Эталонная реализация на Python (Python 3.11, x86-64): оптимизированная — <b>0.58 мс на блок</b> при шифровании и <b>0.62 мс</b> при дешифровании, <b>0.47 с</b> на расписание ключа, <b>0.41 мс</b> на перестановку ГОРНа; неоптимизированная (чистые байтовые таблицы, n² обращений на MDS) — 5.3/6.0 мс и 2.1 с на той же машине. Пакетный режим NumPy: ≈ <b>32 мкс/блок</b> (~2 МБ/с, ×18 к одиночному пути); CuPy (GPU) — ещё на порядок быстрее при партиях ≥ 2¹⁰ блоков; <code>workers&gt;1</code> — масштабирование по ядрам. Пересчёт на C с AVX2/AVX-512 — ниже в §12.3.</p>
+<p><b>Честное сравнение.</b> Табличный AES-128 ≈ 20–25 циклов/байт, AES-NI ≈ 0.7–1.5 цикла/байт,
+Threefish-512 ≈ 6–8 циклов/байт. Отсюда: наивная реализация Kazual-512 медленнее AES-NI на
+два-три порядка, оптимизированная — примерно в 50–150 раз, и лишь в 2–6 раз медленнее табличного
+AES без аппаратного ускорения. Разрыв с AES-NI неустраним: у AES есть выделенные инструкции,
+которых у Kazual нет. Это осознанная цена за 512-битный блок, полную MDS 32×32 и 64×64,
+APN-подстановки, три алгебры и ключезависимые таблицы — за всё то, что покупает 5 раундов
+вместо 14 и запас по дифференциальной стойкости на сотни порядков.</p>
+<p class="note" style="margin-bottom:0">Оценка площади в железе (грубо, по вентилям): одно
+умножение на константу в GF(2⁸) ≈ 20–30 XOR; Веер 64×64 ≈ 4096 умножений ≈ 100K вентилей на
+пол-раунд, 6 пол-раундов ≈ 600K; MDS 32×32 ≈ 25K на такт, 15 тактов ≈ 375K; S-box’ы:
+480 экземпляров, но в bitslice это 28/154/246 AND-гейтов на позицию, то есть ≈100K. Итого
+порядка 10⁶ GE против ~5–30K GE у AES-128. Поправка в пользу Kazual: чтобы получить 512-битный
+блок на AES, нужны 4 параллельных ядра (×4 площади) плюс собственное расписание, так что разрыв
+на бит датапата — примерно два порядка, а не три.</p>
+</div>
+<h3>12.3 Откуда берётся ускорение</h3><div class="card">
+<ul class="clean">
+<li><b>SIMD по состоянию.</b> 32 S-box’а независимы, 32 строки MDS независимы, 64 строки Веера
+независимы, 128 байт Σ-слоя ГОРНа независимы. Половина блока = 256 бит = ровно один регистр
+AVX-512; весь блок = 512 бит = один регистр AVX-512. pshufb-таблицы покрывают S-слой
+(~6 инструкций на такт), CLMUL — умножения в GF.</li>
+<li><b>Динамическая MDS не стоит скорости.</b> Ключ попадает только в таблицу индексов n² байт;
+значения — фиксированный набор из n констант (§3.3). Поэтому горячий цикл — это n² обращений
+к n общим таблицам и n·(n−1) XOR, без единого ключезависимого адреса и без ветвлений.</li>
+<li><b>Обратный Веер бесплатен.</b> M⁻¹ собирается перестановкой индексов фиксированной C⁻¹:
+дешифрование стоит столько же, сколько шифрование (0.62 мс против 0.58 мс в оптимизированном эталоне).</li>
+<li><b>Bitslice и дешёвые квадратичные APN.</b> 28 AND-гейтов у S₁ против 246 у инверсной
+подстановки и 154 у Kasami: x³ = x ⊗ x², а возведение в квадрат в GF(2⁸) — линейная операция
+(чистые XOR), поэтому вся нелинейность сводится к 28 попарным произведениям. Две трети позиций
+каждого такта занимают именно такие подстановки. Отсюда же — дешёвое маскирование.</li>
+<li><b>CLMUL для GF(2¹⁶).</b> Умножение в поле характеристики 2 — одна pclmulqdq + приведение.
+Это снимает единственную большую таблицу проекта (log/alog 256 КБ) и заодно убирает кэш-канал
+в стадии A.</li>
+<li><b>Межблочный параллелизм.</b> В режимах CTR/ECB/GCM блоки независимы → линейное
+масштабирование на любое число ядер и на GPU без изменения алгоритма.</li>
+<li><b>Конвейер.</b> Структура полностью регулярная: 5 одинаковых F и 6 одинаковых H.
+Критический путь короткий по числу <i>разных</i> узлов, конвейер даёт 1 блок за такт после заполнения.</li>
+<li><b>ГОРН как широкий, а не длинный.</b> 8 раундов по 4 стадии при ширине 128 байт вместо
+80 последовательных шагов: глубина схемы — 32 коротких уровня против 80 тяжёлых, причём каждый
+уровень распадается на 128 / 8 / 16 независимых дорожек. На подготовку ключа уходит 385 таких
+перестановок на ключ (391 вместе с одноразовым выводом глобальных констант), и все они
+считаются до начала шифрования.</li>
+<li><b>Реализовано в эталонной реализации (kazual-512.py).</b> Одиночный путь без зависимостей:
+MDS-слои — колоночные big-int таблицы (⊗ линеен по второму аргументу ⇒ таблица из 256 слов
+собирается из 8 базисных; применение — 2n операций вместо n²), стадии Μ и Ρ ГОРНа слиты
+в один проход по 1024-битному слову (поворот лейн — один сдвиг), впитывание губки — целочисленный
+XOR. Пакетный путь: S-слой — один gather по таблице (32×256), MDS — n gather’ов + XOR-накопление,
+ARX — нативная uint64-арифметика; всё векторизуется по блокам на NumPy (CPU) или CuPy (GPU),
+<code>workers&gt;1</code> добавляет межпроцессное масштабирование (на Linux/fork расписание
+наследуется воркерами без перестроения). Результат побитово идентичен одиночному пути —
+проверяется самопроверкой.</li>
+</ul>
+</div>
+<h3>12.4 Память</h3><div class="card">
+<table><thead><tr><th>что</th><th class="n">объём</th><th>зависит от ключа</th></tr></thead><tbody>
+<tr><td>3 S-box’а (статическое ядро)</td><td class="n mono">768 Б</td><td>нет</td></tr>
+<tr><td>32 таблицы умножения для MDS 32×32</td><td class="n mono">8192 Б</td><td>нет</td></tr>
+<tr><td>64 таблицы умножения для MDS 64×64</td><td class="n mono">16384 Б</td><td>нет</td></tr>
+<tr><td>C⁻¹ для n = 8 / 32 / 64</td><td class="n mono">5184 Б</td><td>нет</td></tr>
+<tr><td>log/alog GF(2¹⁶) — <b>не нужны</b> при CLMUL</td><td class="n mono">262144 Б</td><td>нет</td></tr>
+<tr class="hl"><td><b>Итого статических таблиц</b></td><td class="n mono"><b>285 КБ</b> (без GF(2¹⁶): 29 КБ)</td><td>нет</td></tr>
+<tr><td>Динамические таблицы, логический объём</td><td class="n mono">6928 Б</td><td class="good">да</td></tr>
+<tr><td>Динамические таблицы, табличная реализация (маска слита с S-box’ом)</td><td class="n mono">223 КБ</td><td class="good">да</td></tr>
+<tr><td>Динамические таблицы, bitslice/арифметическая реализация</td><td class="n mono">6928 Б</td><td class="good">да</td></tr>
+<tr><td>Динамические таблицы, эталонная реализация на Python (развёрнутые колоночные big-int таблицы MDS + слитые S-таблицы)</td><td class="n mono">≈ 29 МБ</td><td class="good">да</td></tr>
+<tr><td>Контекст пакетного режима NumPy/CuPy (строится лениво, при первом пакетном вызове)</td><td class="n mono">≈ 17 МБ</td><td class="good">да</td></tr>
+</tbody></table>
+<p class="note" style="margin-bottom:0">Разница в 38 раз между табличной и bitslice-реализацией — это плата за отсутствие ветвлений в горячем цикле. В аппаратуре и в защищённых от side-channel реализациях выбирается bitslice, и тогда весь ключезависимый материал — 6928 байт. Эталонная реализация на Python осознанно разворачивает таблицы в память (~29 МБ на ключ) — это плата за скорость в интерпретаторе, а не свойство алгоритма.</p>
+</div>
+<h2 id="s13"><span class="num">§13</span>Kazual-64: учебная версия и ручной пример</h2>
+<p class="lead">У Kazual-512 есть «сын»: <b>Kazual-64</b> — тот же шифр, уменьшенный до размера,
+который можно посчитать вручную. Каркас и компоненты идентичны один-в-один: та же схема
+Лай–Мэсси, те же три S-box’а, та же динамическая Cauchy-MDS, та же Заслонка, та же Несущая
+с тем же чередованием спариваний фаз, тот же Веер, тот же тип расписания ключей с полноценной
+внутренней ветвевой MDS. Отличия <b>только количественные</b> — размеры: изучив Kazual-64,
+человек понимает Kazual-512 автоматически. Все числа ниже получены запуском кода.</p>
+<div class="warn"><b>Kazual-64 не предназначена для защиты данных.</b> 64-битные блок и ключ
+дают потолки 2³² (неотличимость) и 2⁶⁴ (перебор), а число раундов сокращено ради ручного счёта.
+Это учебный инструмент; «младший брат» Kazual-Micro (16-битная F) — тем более: он существует
+только для полных переборов в самопроверке.</div>
+<div class="card"><h4 style="margin-top:0">Kazual-512 против Kazual-64 — отличия только в размерах</h4>
+<table class="tr"><thead><tr><th>узел</th><th class="n">Kazual-512</th><th class="n">Kazual-64</th><th>что сохранено один-в-один</th></tr></thead><tbody>
+<tr><td>блок / ключ</td><td class="n mono">512 / 512 бит</td><td class="n mono">64 / 64 бита</td><td class="small">половины L ‖ R, забеливание входа и выхода</td></tr>
+<tr><td>раунды</td><td class="n mono">5 F + 6 H</td><td class="n mono">2 F + 3 H</td><td class="small">каркас: H₀ → r × (T = F(L⊕R) в обе половины → H)</td></tr>
+<tr><td>тактов в F</td><td class="n mono">3</td><td class="n mono">3</td><td class="small">«аффинная маска → S-box’ы → динамическая MDS» × 3 + эпилог</td></tr>
+<tr><td>S-box’ов в такте</td><td class="n mono">32</td><td class="n mono">4</td><td class="small">те же семейства S₁/S₂/S₃; φ — та же равномерная перестановка мультимножества (код Лемера)</td></tr>
+<tr><td>MDS такта</td><td class="n mono">32×32, BN 33</td><td class="n mono">4×4, BN 5</td><td class="small">динамическая Cauchy: π, ρ из ключа; BN = n+1 при любом ключе</td></tr>
+<tr><td>Заслонка</td><td class="n mono">8 слов × 32, FL/FL⁻¹</td><td class="n mono">1 слово × 32, FL</td><td class="small">слово FL то же — 32 бита; при одном слове чередованию FL/FL⁻¹ не хватит позиций (вход F ровно 32 бита)</td></tr>
+<tr class="hl"><td>Несущая в F</td><td class="n mono">4 слова × 64, 4 фазы</td><td class="n mono">4 слова × 8, 4 фазы</td><td class="small"><b>число слов и фаз идентично</b>; уменьшена только ширина слова</td></tr>
+<tr><td>стадия A</td><td class="n mono">16 чанков GF(2¹⁶)</td><td class="n mono">2 чанка GF(2¹⁶)</td><td class="small">ширина чанка та же; те же M₁, M₂; та же отбраковка (a⊕1)(a′⊕1) ≠ M₁M₂</td></tr>
+<tr class="hl"><td>Несущая в H</td><td class="n mono">8 слов × 64, 4 фазы</td><td class="n mono">8 слов × 8, 4 фазы</td><td class="small"><b>идентично</b>: 4 независимые пары на фазу, чередование «соседние/перекрёстные»</td></tr>
+<tr><td>Веер</td><td class="n mono">MDS 64×64, BN 65</td><td class="n mono">MDS 8×8, BN 9</td><td class="small">выход (p⊕q, p); wt(Δz)=1 ⇒ Δ′ полного веса; обратная матрица бесплатна</td></tr>
+<tr><td>расписание</td><td class="n mono">GFN Type-2: 8×64, 32 раунда</td><td class="n mono">GFN Type-2: 2×32, 16 раундов</td><td class="small">двутактность, самоизменяющиеся таблицы из ведущего регистра, RC, полная MDS (BN = ks_bytes+1)</td></tr>
+<tr class="hl"><td>внутренняя MDS ветви расписания</td><td class="n mono">8×8 (BN 9)</td><td class="n mono">4×4 (BN 5)</td><td class="small"><b>полноценна в обеих</b>: ветвь 4 байта, φ ветви — равномерный код мультимножества {S₁×2, S₂, S₃}</td></tr>
+<tr><td>ГОРН-1024</td><td class="n mono">тигель 1024 бит</td><td class="n mono">тот же</td><td class="small">единственный узел, который не масштабируется: у обеих версий один и тот же ГОРН</td></tr>
+</tbody></table>
+<p class="note" style="margin-bottom:0">Размеры выбраны так, чтобы <b>ни один узел не вырождался</b>
+и каждый шаг вносил измеримый вклад. Несущая сохраняет столько слов, чтобы чётные и нечётные
+фазы действительно переставляли пары (W = 4 и 8 — при W = 2 «перекрёстное» спаривание
+совпало бы с «соседним» и чередование потеряло бы смысл). Ветвь расписания — 4 байта:
+внутренняя MDS 4×4 полноценна (BN 5), а назначение S-box’ов берётся равномерным кодом
+мультимножества (при ветви 2 байта код мультимножества неприменим, а MDS 2×2 почти не даёт
+диффузии). 8-битные слова Несущей — ещё и подарок для ручного счёта: умножение по модулю 2⁸
+умещается в один столбик, а переносная нелинейность в них та же (степень 15 из 16 на модели
+wb = 8 измерена в §7.2).</p>
+</div>
+<div class="card"><h4 style="margin-top:0">Исходные данные примера</h4><div class="formula">
+K  = 0001020304050607
+P  = DEADBEEFCAFEBABE          <span class="cm"># шифруемый блок</span>
+Q  = 5EADBEEFCAFEBABE          <span class="cm"># тот же блок с перевёрнутым битом 31</span>
+
+W  = (2204BB08, 94DF0361)     <span class="cm"># забеливание входа</span>
+W′ = (6B19C91C, 3E758B5A)     <span class="cm"># забеливание выхода</span>
+M₁ = 3423, M₂ = 581D, M₁⊗M₂ = 066F      <span class="cm"># первообразные, §3.5</span>
+</div><div class="formula">
+C(P) = 440B1D239BAA93B5
+C(Q) = CABB2FC675B7ABF6
+Hamming(C(P), C(Q)) = 31 бит из 64   <span class="cm"># идеал — 32</span>
+</div>
+<p class="small">Один перевёрнутый бит входа дал <b>31</b> отличающийся бит из 64 на выходе при 2 раундах (идеал — 32): строгий лавинный эффект уже в учебной инстанции.</p>
+<p class="note" style="margin-bottom:0">Вручную считается <b>шифрование блока при готовых таблицах</b>:
+подстановки, XOR, умножения по модулю 2⁸ (Несущая, Веер, MDS тактов — по готовым таблицам
+умножения), повороты и два десятка умножений в GF(2¹⁶) через log/alog-таблицы на блок.
+Расписание ключей (ГОРН + GFN + КУЗНИЦА) — единственная часть, требующая компьютера:
+для демонстрационного ключа все его изделия уже вычислены и приведены в §13.4.</p></div>
+<h3>13.1 Подробная трассировка первого раунда (P = DEADBEEFCAFEBABE)</h3>
+<p class="note">Здесь видны <b>все</b> стадии, включая те, которые в полной версии руками не повторить. Для S-слоёв в колонке L указано значение на входе S-слоя (ДО аффинной маски A⊗x⊕B — оно равно выходу предыдущей стадии), в колонке R — результат подстановки.</p>
+<table class="tr"><thead><tr><th>шаг</th><th class="mono">L / вход</th><th class="mono">R / выход</th><th>примечание</th></tr></thead><tbody>
+<tr><td class="small">Забеливание (вход) ⊕ W</td><td class="mono">FCA905E7</td><td class="mono">5E21B9DF</td><td class="small note">W = (2204BB08, 94DF0361)</td></tr>
+<tr><td class="small">H₀, стадия A (ортоморфизм)</td><td class="mono">51063D21</td><td class="mono">5E5D4A22</td><td class="small note">2+2 чанка GF(2¹⁶)</td></tr>
+<tr><td class="small">H₀, стадия C (Несущая)</td><td class="mono">867A7CBC</td><td class="mono">3B27F413</td><td class="small note">4 фазы × 4 пары слов по 8 бит</td></tr>
+<tr><td class="small">H₀, стадия B (Веер MDS 8×8): p</td><td class="mono">F5093FCA</td><td class="mono">BDF97CF2</td><td class="small note">выход H₀ = (p ⊕ q, p)</td></tr>
+<tr><td class="small">H₀ выход = (p⊕q, p)</td><td class="mono">48F04338</td><td class="mono">F5093FCA</td><td class="small note"></td></tr>
+<tr><td class="small">Δ = L ⊕ R (вход F₁)</td><td class="mono">BDF97CF2</td><td class="mono">—</td><td class="small note">равно q из предыдущей строки</td></tr>
+<tr><td class="small">  Предтакт: Заслонка</td><td class="mono">84999A0F</td><td class="mono">—</td><td class="small note">FL на 1 слове по 32 бита</td></tr>
+<tr><td class="small">  Предтакт: Несущая</td><td class="mono">03340289</td><td class="mono">—</td><td class="small note">4 фазы × 2 пары слов по 8 бит</td></tr>
+<tr><td class="small">  Такт 1: маска → S-box</td><td class="mono">03340289</td><td class="mono">8DB18756</td><td class="small note">в колонке L — вход S-слоя (до маски A⊗x⊕B), в R — выход</td></tr>
+<tr><td class="small">  Такт 1: MDS 4×4</td><td class="mono">—</td><td class="mono">EB3EDCD3</td><td class="small note"></td></tr>
+<tr><td class="small">  Такт 2: маска → S-box</td><td class="mono">EB3EDCD3</td><td class="mono">B00D75C2</td><td class="small note">в колонке L — вход S-слоя (до маски A⊗x⊕B), в R — выход</td></tr>
+<tr><td class="small">  Такт 2: MDS 4×4</td><td class="mono">—</td><td class="mono">16221DCC</td><td class="small note"></td></tr>
+<tr><td class="small">  Такт 3: маска → S-box</td><td class="mono">16221DCC</td><td class="mono">8BD84AD1</td><td class="small note">в колонке L — вход S-слоя (до маски A⊗x⊕B), в R — выход</td></tr>
+<tr><td class="small">  Такт 3: MDS 4×4</td><td class="mono">—</td><td class="mono">3DA46AEC</td><td class="small note"></td></tr>
+<tr><td class="small">  Эпилог F (аффинный)</td><td class="mono">E765BE2B</td><td class="mono">—</td><td class="small note">T = F(Δ)</td></tr>
+</tbody></table>
+<h3>13.2 Полная трассировка и расходимость одного бита</h3>
+<table class="tr"><thead><tr><th>шаг</th><th class="mono">L(P)</th><th class="mono">L(Q)</th><th class="mono">R(P)</th><th class="mono">R(Q)</th><th class="n">бит различается</th></tr></thead><tbody>
+<tr class="hl"><td class="small">Открытый текст</td><td class="mono">DEADBEEF</td><td class="mono">5EADBEEF</td><td class="mono">CAFEBABE</td><td class="mono">CAFEBABE</td><td class="n diff">L:1 / R:0</td></tr>
+<tr class="hl"><td class="small">Забеливание (вход)</td><td class="mono">FCA905E7</td><td class="mono">7CA905E7</td><td class="mono">5E21B9DF</td><td class="mono">5E21B9DF</td><td class="n diff">L:1 / R:0</td></tr>
+<tr class="hl"><td class="small">Пол-раунд H₀</td><td class="mono">48F04338</td><td class="mono">365F2FAD</td><td class="mono">F5093FCA</td><td class="mono">047BF198</td><td class="n diff">L:20 / R:17</td></tr>
+<tr><td class="small">Раунд 1: Δ = L⊕R</td><td class="mono">BDF97CF2</td><td class="mono">3224DE35</td><td class="mono">—</td><td class="mono">—</td><td class="n diff">19 бит</td></tr>
+<tr><td class="small">  F → T</td><td class="mono">E765BE2B</td><td class="mono">44DC649D</td><td class="mono">—</td><td class="mono">—</td><td class="n diff">19 бит</td></tr>
+<tr class="hl"><td class="small">  L⊕T, R⊕T</td><td class="mono">AF95FD13</td><td class="mono">72834B30</td><td class="mono">126C81E1</td><td class="mono">40A79505</td><td class="n diff">L:17 / R:14</td></tr>
+<tr class="hl"><td class="small">Пол-раунд H₁</td><td class="mono">0E391771</td><td class="mono">59CC8E39</td><td class="mono">DDEFF6EC</td><td class="mono">3AA95CB6</td><td class="n diff">L:17 / R:17</td></tr>
+<tr><td class="small">Раунд 2: Δ = L⊕R</td><td class="mono">D3D6E19D</td><td class="mono">6365D28F</td><td class="mono">—</td><td class="mono">—</td><td class="n diff">14 бит</td></tr>
+<tr><td class="small">  F → T</td><td class="mono">B7DB46C9</td><td class="mono">DC79B801</td><td class="mono">—</td><td class="mono">—</td><td class="n diff">18 бит</td></tr>
+<tr class="hl"><td class="small">  L⊕T, R⊕T</td><td class="mono">B9E251B8</td><td class="mono">85B53638</td><td class="mono">6A34B025</td><td class="mono">E6D0E4B7</td><td class="n diff">L:15 / R:13</td></tr>
+<tr class="hl"><td class="small">Пол-раунд H₂</td><td class="mono">2F12D43F</td><td class="mono">A1A2E6DA</td><td class="mono">A5DF18EF</td><td class="mono">4BC220AC</td><td class="n diff">L:15 / R:16</td></tr>
+<tr class="hl"><td class="small">Забеливание (выход)</td><td class="mono">440B1D23</td><td class="mono">CABB2FC6</td><td class="mono">9BAA93B5</td><td class="mono">75B7ABF6</td><td class="n diff">L:15 / R:16</td></tr>
+</tbody></table>
+<p class="small">Это ключевая иллюстрация преимущества Лай–Мэсси перед Фейстелем:
+уже после начального пол-раунда H₀ различие есть в обеих половинах (37 бит в сумме из 64),
+тогда как классический Фейстель один раунд держит вторую половину нетронутой. Обратите внимание
+на строку «L⊕T, R⊕T»: количество различий в L и в R там одинаковое по построению — один и тот же T
+прибавляется к обеим половинам, — и именно пол-раунд H каждый раз ломает эту симметрию.</p>
+<h3>13.3 Как проверить первые шаги руками (без запуска кода)</h3><div class="card">
+<ol class="small">
+<li><b>Забеливание.</b> W = (2204BB08, 94DF0361):<div class="formula">DEAD ⊕ 2204 = FCA9    BEEF ⊕ BB08 = 05E7
+CAFE ⊕ 94DF = 5E21    BABE ⊕ 0361 = B9DF</div></li>
+<li><b>Стадия A пол-раунда H₀, чанк 0.</b> Параметры: <code>a = (7D99, DB60)</code>, <code>b = (BC4F, D307)</code>, <code>a′ = (5F9D, 6068)</code>, <code>b′ = (2890, D066)</code>, <code>M₁ = 3423</code>, <code>M₂ = 581D</code>. Считаем в GF(2¹⁶) с полиномом <code>0x1100B</code>, умножение через log/alog: <code>a ⊗ b = alog[(log a + log b) mod 65535]</code>.<div class="formula">u[c] = a[c] ⊗ L[c] ⊕ b[c] ⊕ M₁ ⊗ R[c]
+v[c] = a′[c] ⊗ R[c] ⊕ b′[c] ⊕ M₂ ⊗ u[c]
+
+u[0] = 7D99 ⊗ FCA9 ⊕ BC4F ⊕ 3423 ⊗ 5E21 = E283 ⊕ BC4F ⊕ 0FCA = 5106
+v[0] = 5F9D ⊗ 5E21 ⊕ 2890 ⊕ 581D ⊗ 5106 = 8B13 ⊕ 2890 ⊕ FDDE = 5E5D
+
+(L, R) = (FCA905E7, 5E21B9DF)   →   (u, v) = (51063D21, 5E5D4A22)</div>Треугольность видна явно: v использует уже посчитанное u, поэтому обратный ход — два прохода.</li>
+<li><b>Несущая и Веер.</b> z = (u ‖ v) = 51063D215E5D4A22 проходит 4 фазы Несущей на 8 словах по 8 бит (4 независимые пары на фазу, чередование «соседние/перекрёстные» — как в полной версии) → 867A7CBC3B27F413, затем Веер MDS 8×8 → (p, q) = (F5093FCA, BDF97CF2), и пол-раунд выдаёт <code>(p ⊕ q, p) = (48F04338, F5093FCA)</code>.<div class="formula">Δ = L ⊕ R = 48F04338 ⊕ F5093FCA = BDF97CF2   ✓ совпадает с q — это и есть свойство Веера из §8.3</div></li>
+<li><b>Расхождение одного бита.</b> Для Q = 5EADBEEF… различие после забеливания — 1 бит в L. После H₀: L(P) = 48F04338 против L(Q) = 365F2FAD (20 бит), R(P) = F5093FCA против R(Q) = 047BF198 (17 бит) — в сумме <b>37 бит из 64</b>. Фейстель на этом шаге держал бы вторую половину нетронутой.</li>
+<li><b>Первый такт F.</b> На вход приходит Δ = BDF97CF2. Заслонка (FL на 1 слове по 32 бита; k₁ = 3DCE9FBD, k₂ = A6EEE6FC, поворот s = 1) даёт 84999A0F, Несущая (4 фазы по 2 пары слов по 8 бит) даёт 03340289. Затем для каждой позиции i берётся слитая таблица <code>fused[0][i] = S<sub>φ[0][i]</sub>(A[0][i] ⊗ x ⊕ B[0][i])</code>: <div class="formula">вход S-слоя : 03340289
+выход S-слоя: 8DB18756</div></li>
+<li><b>MDS 4×4 первого такта.</b> На вход линейного слоя приходит выход S-слоя <code>8DB18756</code>. Матрица (динамическая Cauchy: π и ρ из ключа, значения — из фиксированного набора {(4+t)⁻¹} = {D1, 52, 7B, CB}):<div class="formula">D1 52 7B CB
+7B CB D1 52
+CB 7B 52 D1
+52 D1 CB 7B</div>Считаем в GF(2⁸) с полиномом <code>0x11B</code> и образующим 3 — все четыре строки:<div class="formula">z0 = D1⊗8D ⊕ 52⊗B1 ⊕ 7B⊗87 ⊕ CB⊗56 = E5 ⊕ 25 ⊕ B3 ⊕ 98 = EB
+z1 = 7B⊗8D ⊕ CB⊗B1 ⊕ D1⊗87 ⊕ 52⊗56 = B0 ⊕ E7 ⊕ 8E ⊕ E7 = 3E
+z2 = CB⊗8D ⊕ 7B⊗B1 ⊕ 52⊗87 ⊕ D1⊗56 = E8 ⊕ BA ⊕ 2B ⊕ A5 = DC
+z3 = 52⊗8D ⊕ D1⊗B1 ⊕ CB⊗87 ⊕ 7B⊗56 = 29 ⊕ 84 ⊕ 67 ⊕ 19 = D3</div>Результат <code>EB3EDCD3</code> — совпадает с трассировкой ✓. Обратите внимание: в матрице всего 4 различных значения, расставленных в разном порядке по строкам, — это и есть свойство «множество значений фиксировано, расположение ключезависимо» из §3.3.</li>
+<li><b>Прибавление T к обеим половинам.</b> T = F(Δ) = E765BE2B:<div class="formula">L ⊕ T = 48F04338 ⊕ E765BE2B = AF95FD13
+R ⊕ T = F5093FCA ⊕ E765BE2B = 126C81E1
+Δ после прибавления = AF95FD13 ⊕ 126C81E1 = BDF97CF2   ✓ не изменилась</div>Один и тот же T ушёл в обе половины — именно эта инвариантность и требует следующего H. Следующий пол-раунд H₁ даёт (0E391771, DDEFF6EC), и новая разница половин уже другая: D3D6E19D.</li>
+<li><b>Обратимость без F⁻¹.</b> Зная (AF95FD13, 126C81E1), дешифрование вычисляет их разность <code>AF95FD13 ⊕ 126C81E1 = BDF97CF2</code> — ту же самую Δ, из которой получается тот же T = E765BE2B. Инвертировать F не понадобилось; понадобилось обратить только H, а он биективен по построению (§8).</li>
+</ol>
+<p class="note" style="margin-bottom:0">Дальше второй раунд повторяет первый с другими таблицами КУЗНИЦЫ, а завершает шифрование забеливание выхода W′ = (6B19C91C, 3E758B5A): 2F12D43F ⊕ 6B19C91C = 440B1D23 и A5DF18EF ⊕ 3E758B5A = 9BAA93B5, то есть C(P) = 440B1D239BAA93B5.</p>
+</div>
+<h3>13.4 Таблицы экземпляра Kazual-64 (чтобы пример был воспроизводим)</h3><div class="card">
+<h4>Линейные слои</h4><div class="formula">Базовая Cauchy-MDS 8×8, строка 0 : E8 4F 29 C0 B0 E1 E5 C7
+Веер H₀ (Π, Ρ из ключа), строка 0   : 29 4F C7 C0 B0 E5 E8 E1
+Такт 1 F₀, MDS 4×4, строка 0      : D1 52 7B CB
+<span class="cm"># в каждой строке Веера — перестановка одного и того же набора из 8 констант</span></div>
+<h4>Стадия A всех трёх пол-раундов (чанки GF(2¹⁶))</h4><table class="tr"><thead><tr><th>H<sub>i</sub></th><th>a[0], a[1]</th><th>b[0], b[1]</th><th>a′[0], a′[1]</th><th>b′[0], b′[1]</th></tr></thead><tbody>
+<tr><td class="mono">H0</td><td class="mono">7D99 DB60</td><td class="mono">BC4F D307</td><td class="mono">5F9D 6068</td><td class="mono">2890 D066</td></tr>
+<tr><td class="mono">H1</td><td class="mono">EE13 4494</td><td class="mono">2B03 9240</td><td class="mono">2B04 3A7B</td><td class="mono">8DEB 3278</td></tr>
+<tr><td class="mono">H2</td><td class="mono">6A8F 6727</td><td class="mono">92E0 7D6A</td><td class="mono">3AA3 654E</td><td class="mono">A084 B6A4</td></tr>
+</tbody></table>
+<h4>Параметры Несущей и Заслонки</h4><div class="formula">Несущая Предтакта F₀ (слова по 8 бит, 4 фазы × 2 пары):
+        фаза 0: (j=0,k=1,α=4,m=CF,c=C9)   (j=2,k=3,α=5,m=E1,c=B7)
+        фаза 1: (j=0,k=3,α=2,m=E1,c=81)   (j=2,k=1,α=1,m=B7,c=5D)
+        фаза 2: (j=0,k=1,α=6,m=43,c=95)   (j=2,k=3,α=0,m=DB,c=73)
+        фаза 3: (j=0,k=3,α=5,m=DF,c=2F)   (j=2,k=1,α=6,m=C7,c=0D)
+
+Несущая H₀ (слова по 8 бит, 4 фазы × 4 пары):
+        фаза 0: (j=0,k=1,α=7,m=4D,c=21)   (j=2,k=3,α=2,m=7F,c=F1)
+                (j=4,k=5,α=4,m=91,c=37)   (j=6,k=7,α=1,m=1F,c=2B)
+        фаза 1: (j=0,k=7,α=5,m=01,c=D5)   (j=2,k=1,α=6,m=53,c=99)
+                (j=4,k=3,α=3,m=6D,c=9F)   (j=6,k=5,α=1,m=F3,c=13)
+        фаза 2: (j=0,k=1,α=7,m=A7,c=E7)   (j=2,k=3,α=0,m=7F,c=CB)
+                (j=4,k=5,α=7,m=FD,c=9B)   (j=6,k=7,α=0,m=F3,c=CD)
+        фаза 3: (j=0,k=7,α=7,m=3B,c=AD)   (j=2,k=1,α=4,m=4B,c=03)
+                (j=4,k=3,α=5,m=73,c=5B)   (j=6,k=5,α=0,m=3B,c=55)
+
+Заслонка F₀: k₁ = 3DCE9FBD, k₂ = A6EEE6FC, поворот s = 1</div>
+<p class="note">Посмотрите на спаривания: чётные фазы соединяют в пары соседние слова (0,1), (2,3), …,
+нечётные — перекрёстные (0,W−1), (2,1), (4,3), … Как и в Kazual-512, фазы действительно
+переставляют пары слов: при W = 4 и W = 8 чередование содержательно (при двух словах на состояние
+обе схемы спаривания совпали бы — поэтому число слов сохранено как в полной версии).</p>
+<h4>Слитые таблицы «маска → S-box» первого такта F₀</h4><p class="note">Каждая строка — полная 256-байтовая таблица <code>fused[0][i] = S<sub>φ[0][i]</sub>(A⊗x ⊕ B)</code>; показаны первые 32 значения. Именно по ним такт считается одним обращением к памяти на позицию.</p><table class="tr"><thead><tr><th class="n">i</th><th>fused[0][i][0 … 31]</th></tr></thead><tbody>
+<tr><td class="n mono">0</td><td class="mono small">6B 52 72 8D 0F 94 7C 21 A9 1B D7 A3 B0 A0 A4 72 A2 EB 8F 00 D3 38 94 B9 A5 67 EF EB A9 C9 89 2F …</td></tr>
+<tr><td class="n mono">1</td><td class="mono small">40 AB FC 8D 72 C1 59 15 A8 E7 BE 52 23 F4 8A 0C 71 2A E6 69 1D 56 D9 B0 F8 05 9A 73 4E D2 9F 78 …</td></tr>
+<tr><td class="n mono">2</td><td class="mono small">66 A7 87 F2 E7 03 AB DF C6 DD A4 D3 E5 87 73 AC 44 F5 DC 18 03 E1 39 15 1D 2F 54 18 A4 0E 1F 85 …</td></tr>
+<tr><td class="n mono">3</td><td class="mono small">A5 AB 67 1B DD E4 A2 E9 03 02 62 11 E4 D2 38 7C C8 47 72 8F DF 67 D8 12 FA 7A E3 11 72 C5 D6 13 …</td></tr>
+</tbody></table>
+<p class="note" style="margin-bottom:0">Базовые таблицы S₁/S₂/S₃, из которых собраны слитые, приведены в §3.2 полностью.</p>
+</div>
+<div class="card"><h4 style="margin-top:0">Что измерено в Kazual-64 (те же механизмы, тот же масштабный ряд)</h4>
+<table class="tr"><thead><tr><th>свойство</th><th class="n">Kazual-64</th><th class="n">Kazual-512 (§11.3)</th></tr></thead><tbody>
+<tr><td>строгий лавинный критерий по тексту (все 64 однобитовых различия)</td><td class="n good">32.0 из 64 (идеал 32), разброс 23…43</td><td class="n">256.1 из 512</td></tr>
+<tr><td>лавина по ключу (однобитовые различия, по одному на байт ключа)</td><td class="n good">29.9 из 64 в среднем</td><td class="n">253.2 из 512</td></tr>
+<tr><td>активные S-box’ы в F: полный перебор различий весом 1 байт (4 позиции × 255)</td><td class="n good">min 10 за вызов (доказуемая граница 6)</td><td class="n">min 82 (граница 34)</td></tr>
+<tr><td>Веер: wt(Δz) = 1 ⇒ Δ′ полного веса</td><td class="n good">4 из 4 во всех 8 позициях</td><td class="n">32 из 32 во всех 64</td></tr>
+<tr><td>Несущая в H: 1 бит входа → покрытие слов после 4 фаз</td><td class="n good">1.8 → 3.3 → 5.4 → 7.3 слова из 8 (в среднем)</td><td class="n">2 → 4 → 6 → 8 слов из 8</td></tr>
+<tr><td>расписание: 1 бит ключа → различие в out₀</td><td class="n good">16 байт из 16</td><td class="n">126 байт из 128</td></tr>
+<tr><td>необратимость F</td><td class="n good">|image| ≤ 86³·256 = 2^27.3 из 2³²</td><td class="n">≤ 2^221.4 из 2²⁵⁶</td></tr>
+<tr><td>бюджет ключевого материала</td><td class="n good">200 из 256 байт (78%)</td><td class="n">1792 из 4096 (44%)</td></tr>
+</tbody></table>
+<p class="note" style="margin-bottom:0">Дифференциальная оценка масштабируется тем же рассуждением, что в §7.3:
+MDS такта 4×4 имеет BN 5 ⇒ act₁+act₂ ≥ 5 и act₂+act₃ ≥ 5 ⇒ act₁+act₂+act₃ ≥ 6 при любом ключе
+⇒ p ≤ (2⁻⁶)⁶ = 2⁻³⁶ на вызов F в худшем случае (измерено min 10 активных ⇒ 2⁻⁶⁰).
+Это учебные числа: стойкость Kazual-64 всё равно упирается в 64-битные блок и ключ
+(потолки 2³² и 2⁶⁴), поэтому назначение версии — обучение структуре Kazual-512, а не защита.</p></div>
+<h2 id="s14"><span class="num">§14</span>Тестовые векторы</h2>
+<p class="note">Kazual-512, ключ и блок по 512 бит (64 байта, hex). Каждый вектор проверен
+обратным ходом: <code>Decrypt(K, Encrypt(K, P)) = P</code>. Векторы получены эталонной реализацией
+и лежат в <code>kazual/results.json</code>; однофайловая реализация <code>kazual-512.py</code>
+воспроизводит их побитово (режим <code>--vectors</code> выполняет явную сверку).</p>
+<table class="tr"><thead><tr><th class="n">#</th><th>ключ K</th><th>открытый текст P</th><th>шифртекст C</th></tr></thead><tbody>
+<tr><td class="n">0</td><td class="mono small wrapx">0000000000000000000000000000000000000000000000000000000000000000<br>0000000000000000000000000000000000000000000000000000000000000000</td><td class="mono small wrapx">0000000000000000000000000000000000000000000000000000000000000000<br>0000000000000000000000000000000000000000000000000000000000000000</td><td class="mono small wrapx">bf4e839f40f364a6a5b721b181d8cba7d6b3fb6b54f5d9dff719a929c3c51942<br>13ddd2f672593d8c50924b80421a5eb558062fcc50297f78bdb34d311d9b1570</td></tr>
+<tr><td class="n">1</td><td class="mono small wrapx">1111111111111111111111111111111111111111111111111111111111111111<br>1111111111111111111111111111111111111111111111111111111111111111</td><td class="mono small wrapx">2222222222222222222222222222222222222222222222222222222222222222<br>2222222222222222222222222222222222222222222222222222222222222222</td><td class="mono small wrapx">cd9f774203c522e959b178d21d6cc8999b27cd3fb6a4981fafb948401ca8a73c<br>4bf1e50ce574bf269e9a9dc8f14a29b7cff07121b87accc2d11bc2ec05717144</td></tr>
+<tr><td class="n">2</td><td class="mono small wrapx">b41821d957abca690902be3d117e4497f6792a07dc745267c4200c0145e6f9cd<br>934a2c70740b143eedaceead5d70a6a22e0eedce00125bf4790150fe36acfa8e</td><td class="mono small wrapx">000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f<br>202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f</td><td class="mono small wrapx">e245b322acf94409d8c29de0edc0a66b2f7db782ab11832cdb0ebefb21fd5859<br>565457b705f093483e35863c07a67825c1a94086e8ae3fead70263cc5c203c18</td></tr>
+<tr><td class="n">3</td><td class="mono small wrapx">000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f<br>202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f</td><td class="mono small wrapx">deadbeefcafebabedeadbeefcafebabedeadbeefcafebabedeadbeefcafebabe<br>deadbeefcafebabedeadbeefcafebabedeadbeefcafebabedeadbeefcafebabe</td><td class="mono small wrapx">38ad0a35c672e647fca1c47d935aad536b71a44aebdaa8b535596f6645c64423<br>23495721fd4d3b81a0f0ffbc81de5fb45f9cf6300065495af744e9e44189b503</td></tr>
+</tbody></table>
+<div class="card"><h4 style="margin-top:0">Kazual-64 (блок 64 бита, ключ 0001020304050607)</h4><div class="formula">
+DEADBEEFCAFEBABE  →  440B1D239BAA93B5
+
+5EADBEEFCAFEBABE  →  CABB2FC675B7ABF6
+
+0000000000000000  →  6B3978012BEA613E
+
+FFFFFFFFFFFFFFFF  →  F5732CC2519C5222
+
+</div>
+<p class="small" style="margin-bottom:0">Показателен вектор №0 таблицы Kazual-512 выше: нулевой
+ключ и нулевой блок дают нетривиальный шифртекст; в Kazual-64 нулевой блок (третья строка) тоже
+шифруется в нетривиальный текст. У DES в этой ситуации были слабые ключи (при некоторых K шифр
+становился инволюцией); здесь вырожденных точек нет: ГОРН на входе расписания убирает «удобные»
+ключи, отбраковка запрещает a, a′ ∈ {0,1} и значение (a⊕1)(a′⊕1) = M₁M₂, а 60 случайных пар (K, P)
+не дали ни одной неподвижной точки.</p></div>
+<h2 id="s15"><span class="num">§15</span>Что осталось недоказанным</h2>
+<p class="lead">Конструкция спроектирована так, чтобы каждое решение имело измеримое обоснование,
+но это не значит, что она проанализирована. Ниже — честный список того, что требует работы.
+Часть вопросов, обычно висящих в таких конструкциях открытыми, закрыта строго
+(§11.2 и врезка в конце этого раздела), и в этот список они не попали.</p>
+<table><thead><tr><th class="n">#</th><th>вопрос</th><th>что есть сейчас</th><th>что нужно</th></tr></thead><tbody>
+<tr><td class="n">1</td><td><b>Формальная редукция усиленного каркаса к SPRP.</b> Теорема Воденэ покрывает канонический <code>H(L,R) = (σ(L), R)</code>. Наш H — трёхстадийный, ключевой, нелинейный</td><td class="small">три доказанных свойства (§8): стадия A — ортоморфизм всей 512-битной XOR-группы при любом допустимом ключе; H — биекция; Δ′ = M<sub>низ</sub>·z с матрицей без нулей и с невырожденными 32×32 подматрицами ⇒ Δ′ ≠ 0 ⇔ Δ ≠ 0 и wt(Δ)=1 ⇒ wt(Δ′)=32. Плюс измеренная лавина 254.8/512 и вес Δ на входе F 31 из 32</td><td class="small">доказательство в рамке quasi-Feistel (Юн–Пак–Ли) или extended Lai–Massey для композиции «ортоморфизм → биекция → MDS»</td></tr>
+<tr><td class="n">2</td><td><b>ГОРН-1024 не проанализирован.</b> Собственная сжимающая функция без внешней проверки</td><td class="small">внутренняя перестановка биективна (явный обратный ход), ранг свёртки ровно 512, SAC 256.2/512, 0 коллизий на 3000 входов; стойкость к прообразу оценивается как у губки с ёмкостью 512 бит</td><td class="small">дифференциальный и линейный анализ 8-раундовой перестановки, оценка ёмкостного запаса; в идеале — независимая проверка третьими лицами</td></tr>
+<tr><td class="n">3</td><td><b>Сведение «разделитель на 2²⁵⁶ → восстановление ключа».</b> Два разных потолка стойкости нельзя смешивать, и переход от одного к другому не доказан</td><td class="small">конструктивный аргумент: все структуры, связывающие наблюдение с ключом (π, ρ, φ, аффинные маски, параметры Несущей и Заслонки), у каждого ключа свои, и их 2⁵¹² вариантов (§11.8)</td><td class="small">формальное доказательство того, что 2²⁵⁶-запросный разделитель не даёт атаки восстановления ключа дешевле 2⁵¹²</td></tr>
+<tr><td class="n">4</td><td><b>Side-channel: маскирование не описано.</b></td><td class="small">bitslice-стоимость посчитана (28 / 154 / 246 AND-гейтов с общими подтермами; аффинная маска добавляет только XOR); Несущая, Заслонка и Веер бестабличны; ключезависимых адресов памяти в горячем цикле нет — множество значений MDS фиксировано (§3.3)</td><td class="small">полная маскированная реализация с доказательством в модели t-SNI/t-PNI и замером утечек</td></tr>
+<tr><td class="n">5</td><td><b>Kazual-64 не стоек</b> и не должен анализироваться как шифр</td><td class="small">это учебная версия для ручного счёта (64-битные блок и ключ, 2 раунда); назначение — обучение структуре Kazual-512, не защита</td><td class="small">ничего: так и задумано</td></tr>
+<tr><td class="n">6</td><td><b>Сокращённый режим расписания не измерен.</b> Для key-agile сценариев определён режим из 4 раундов Стадии 1</td><td class="small">режим объявлен небезопасным и по умолчанию выключен</td><td class="small">измерение related-key запаса сокращённого режима, если он кому-то понадобится</td></tr>
+</tbody></table>
+<div class="ok"><b>15.1 Что закрыто и как.</b> Три пункта, которые в таких конструкциях обычно
+висят открытыми, здесь закрыты строго:
+(i) <b>смещение распределения ключевого материала</b> — запрещённые значения не подменяются
+константой, а <b>отбраковываются</b>; перестановки берутся кодом Лемера (смещение ≤ 2⁻⁹⁶),
+нечётные множители — через <code>x|1</code> (смещение ровно 0). Итог: распределение равномерное
+в строгом смысле, а не «пренебрежимо смещённое».
+(ii) <b>энтропия ключа</b> — расписание биективно (§9.2), поэтому 512 бит ключа доходят до
+подключей без потерь; это отдельное доказательство, а не предположение.
+(iii) <b>ключезависимость линейного слоя</b> — ветвевое число динамической Cauchy-MDS равно n+1
+для любого ключа (§3.3), поэтому введение динамических таблиц не стоило ни бита доказуемой
+дифференциальной и линейной стойкости.</div>
+<h2 id="s16"><span class="num">§16</span>Файлы проекта и источники</h2>
+<div class="card">
+<h4 style="margin-top:0">Файлы проекта</h4>
+<table class="tr"><thead><tr><th>файл</th><th>что внутри</th></tr></thead><tbody>
+<tr><td class="mono">kazual-512.html</td><td>эта спецификация («теория»)</td></tr>
+<tr><td class="mono">kazual-512.py</td><td>эталонная однофайловая реализация («практика») без обязательных зависимостей. Разделы файла: §1 поля и матрицы · §2 ГОРН-1024 · §3 S-box’ы · §4 КУЗНИЦА · §5 Несущая/Заслонка · §6 инстанции Spec (Kazual-512 / Kazual-64 / Kazual-Micro) · §7 F и H · §8 расписание ключей · §9 каркас · §10 пакетная обработка (опциональные NumPy/CuPy, multiprocessing) · §11 обратный ход ГОРНа · §12 самопроверки, векторы, трассы, бенчмарк, CLI. Режимы: <code>--selftest</code>, <code>--vectors</code>, <code>--trace</code>, <code>--bench</code>, <code>--enc/--dec K X</code></td></tr>
+</tbody></table>
+<p class="note">Расширенный измерительный пакет (<code>kazual/consts_seed.py, fields.py, gorn.py,
+gorn_check.py, sbox.py, forge.py, arx.py, kazual.py, results.py → results.json, build_html.py</code>) —
+источник, из которого собран данный документ; однофайловая реализация воспроизводит алгоритм,
+векторы, трассы и ключевое подмножество измерений (§11.3). NumPy и CuPy необязательны:
+без них работает одиночный путь на чистом Python, с ними — пакетный (CPU/GPU).</p>
+<h4>Идеи, которые переработаны (а не скопированы)</h4>
+<table class="tr"><thead><tr><th>источник</th><th>что взято</th><th>что изменено</th></tr></thead><tbody>
+<tr><td>X. Lai, J. L. Massey (EUROCRYPT’90); S. Vaudenay (ASIACRYPT’99)</td>
+    <td>каркас: один T в обе половины, F может быть необратимой</td>
+    <td>пол-раунд H — трёхстадийный, ключевой и нелинейный; добавлены Веер и Несущая</td></tr>
+<tr><td>IDEA</td><td>смешение ⊕, +, ⊗ и идея «5.5 раундов»</td>
+    <td>умножение — в GF(2¹⁶), а не по модулю 2¹⁶+1, поэтому ортоморфизмы существуют;
+        сложение mod 2⁶⁴ вынесено в отдельную стадию (Несущая)</td></tr>
+<tr><td>MARS, Threefish</td><td>ARX с ключевыми поворотами и умножением; попарный микшер со сменой спаривания</td>
+    <td>подшаг треугольный (<code>w[j]</code> → <code>w[k]</code>), поэтому обратимость не требует
+        обращения умножения; спаривание «перекрёстное», а не сдвиговое</td></tr>
+<tr><td>Camellia / CLEFIA</td><td>FL/FL⁻¹-подслой как ключезависимая битовая маска</td>
+    <td>поворот ключевой (0…31), а не фиксированный 1; чередование FL/FL⁻¹ по позициям,
+        а не последовательная пара</td></tr>
+<tr><td>Twofish, Blowfish, FROG, MESH</td><td>ключезависимые подстановки и перестановки</td>
+    <td>таблицы выплавляются из сида КУЗНИЦЕЙ и доказуемо сохраняют δ, NL и ветвевое число;
+        перестановки не произвольные, а координаты матрицы Коши — поэтому MDS сохраняется</td></tr>
+<tr><td>PRINCE, MANTIS</td><td>«обратный линейный слой должен быть бесплатным»</td>
+    <td>приём перенесён в расписание: M⁻¹ = P<sub>ρ</sub>⁻¹C⁻¹P<sub>π</sub>⁻¹, то есть фиксированная
+        матрица с переставленными индексами</td></tr>
+<tr><td>Kalyna, Кузнечик</td><td>тяжёлое расписание ключей, полная MDS</td>
+    <td>расписание двутактное и самоизменяющееся, с доказательством биективности вместо декларации
+        «односторонности»</td></tr>
+<tr><td>Rijndael (wide-trail), K. Nyberg (APN)</td><td>стратегия широкой тропы; APN-подстановки</td>
+    <td>матрица — динамическая Cauchy, поэтому ветвевое число n+1 доказуемо при любом ключе;
+        APN-подстановки допустимы именно потому, что F необратима</td></tr>
+<tr><td>DES, Skipjack, KASUMI/MISTY1, FOX, WIDEA, Klein</td>
+    <td>забеливание краёв; вложенные раундовые функции; широкие блоки как параллельные дорожки</td>
+    <td>забеливание растворено в аффинных масках каждого такта и дополнено Заслонкой;
+        «ширина» блока используется как 4/8 независимых SIMD-дорожек внутри раунда</td></tr>
+</tbody></table>
+<h4>Литература, на которую опирается дизайн</h4>
+<p class="small note" style="margin-bottom:0">X. Lai, J. L. Massey, «A Proposal for a New Block
+Encryption Standard» (EUROCRYPT’90); S. Vaudenay, «On the Lai-Massey Scheme» (ASIACRYPT’99);
+A. Yun, J. H. Park, J. Lee, «Lai-Massey Scheme and Quasi-Feistel Networks» (eprint 2007/347);
+M. Luby, C. Rackoff (1988); J. Daemen, V. Rijmen, «The Design of Rijndael» (wide-trail strategy);
+K. Nyberg, «Differentially Uniform Mappings for Cryptography» (EUROCRYPT’93, APN-функции);
+A. Biryukov, D. Khovratovich, I. Nikolić, «Biclique Cryptanalysis of the Full AES»;
+V. T. Hoang, P. Rogaway, «On Generalized Feistel Networks» (ASIACRYPT 2010);
+S. Matsui, «New Linear Cryptanalysis Method and an Improved Profile of the Fast Linear Transform»
+(Camellia FL); D. Whiting, R. Housley, N. Ferguson, «AES Encryption for Counter Mode».</p>
+</div>
+<footer>
+<p>Документ сгенерирован из проверенного кода: все числа в таблицах получены запуском
+<code>kazual/results.py</code>, а не переписаны из литературы. Синхронность теории и практики
+подтверждается запуском <code>kazual-512.py --vectors --trace</code>: векторы §14 и трасса §13
+(включая внутренние стадии и таблицы Kazual-64) совпадают побайтно, а <code>--selftest</code>
+фиксирует точные константы и бюджет расписания. Разделы, где утверждение
+доказано, помечены явно; где измерено — указано число проб; где остаётся эвристика — это
+сказано прямо (§15).</p>
+<p>Kazual-512 · блок 512 бит · ключ 512 бит · 5 тяжёлых раундов · 42864 элементарных операций на блок ·
+6928 байт динамических таблиц на ключ · ни одного внешнего криптографического примитива.</p>
+</footer>
+</div></body></html>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#232a3d"/>
+      <stop offset="1" stop-color="#141824"/>
+    </linearGradient>
+    <linearGradient id="k" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8f7fff"/>
+      <stop offset="1" stop-color="#6d5df6"/>
+    </linearGradient>
+    <linearGradient id="t" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)" stroke="#2a3040" stroke-width="2"/>
+  <!-- дужка замка -->
+  <path d="M44 46 v-10 a20 20 0 0 1 40 0 v10" fill="none" stroke="url(#t)" stroke-width="9" stroke-linecap="round"/>
+  <!-- буква K -->
+  <path d="M42 44 v56" stroke="url(#k)" stroke-width="13" stroke-linecap="round"/>
+  <path d="M86 44 L52 70 L88 100" fill="none" stroke="url(#k)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- узлы схемы -->
+  <circle cx="88" cy="42" r="5.5" fill="#2dd4bf"/>
+  <circle cx="90" cy="102" r="5.5" fill="#2dd4bf"/>
+  <circle cx="42" cy="70" r="4" fill="#141824" stroke="#8f7fff" stroke-width="3"/>
+</svg>
